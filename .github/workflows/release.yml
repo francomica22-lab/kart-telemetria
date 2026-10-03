@@ -47,6 +47,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          git fetch --force --tags   # checkout deja el tag liviano; trae el anotado con sus notas
           $notes = git tag -l --format='%(contents)' "${{ github.ref_name }}"
           if (-not $notes) { $notes = "Versión ${{ github.ref_name }}" }
           Set-Content -Encoding utf8 notas.txt $notes
