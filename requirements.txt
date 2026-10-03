@@ -1,0 +1,6 @@
+libxrk==0.13.0
+numpy==2.5.3
+pandas==3.0.6
+scipy==1.18.1
+pyarrow==25.0.1
+pywebview>=5,<7

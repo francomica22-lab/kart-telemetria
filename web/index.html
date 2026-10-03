@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Análisis Karting</title>
+<meta name="kt-version" content="__VERSION__">
+<link rel="stylesheet" href="styles.css">
+<script>
+  // en la pagina web (github.io) el analisis corre en el navegador con Pyodide
+  if (/github\.io$/.test(location.hostname) || /[?&]web\b/.test(location.search)) document.write('<script src="web-backend.js"><\/script>');
+</script>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <header class="brand">
+      <div class="mark"><b>Análisis Karting</b><span>offline</span></div>
+      <button class="folder" id="pick" title="Cambiar carpeta de datos">
+        <span class="fl">
+          <span class="eyebrow">Carpeta de tandas</span>
+          <span class="fname" id="fname">—</span>
+          <span class="fpath" id="path"></span>
+        </span>
+        <span class="fchg">Cambiar</span>
+      </button>
+    </header>
+
+    <div class="filters">
+      <div class="searchbox">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M13 13l4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <input id="q" type="search" placeholder="Buscar tanda, fecha, kart o comentario" autocomplete="off">
+      </div>
+      <div class="fopts">
+        <label class="toggle"><input type="checkbox" id="onlylaps" checked><span>Solo tandas con vueltas</span></label>
+        <button class="link" id="reload" title="Volver a leer la carpeta">Actualizar</button>
+      </div>
+    </div>
+
+    <div class="list" id="list"><p class="muted pad">Buscando tandas…</p></div>
+
+    <footer class="foot">
+      <div class="tray" id="tray"><span class="muted">Tocá dos o más tandas de la lista.</span></div>
+      <button class="btn primary" id="go" disabled>Comparar</button>
+      <details class="settings">
+        <summary>Ajustes del análisis</summary>
+        <div class="opts">
+          <label for="top">Mejores vueltas a promediar</label>
+          <input id="top" type="number" min="1" max="5" value="3">
+          <label for="b1a">Banda RPM 1</label>
+          <span class="pair"><input id="b1a" type="number" step="500" value="10000"><i>→</i><input id="b1b" type="number" step="500" value="12000"></span>
+          <label for="b2a">Banda RPM 2</label>
+          <span class="pair"><input id="b2a" type="number" step="500" value="12000"><i>→</i><input id="b2b" type="number" step="500" value="13500"></span>
+        </div>
+      </details>
+    </footer>
+  </aside>
+
+  <main class="main" id="main">
+    <div class="topbar" id="topbar"></div>
+    <div class="empty" id="empty">
+      <div class="eyebrow">Comparación de tandas</div>
+      <h1>Elegí las tandas a comparar</h1>
+      <p>Tocá las tandas en la lista. Cada una toma un color. Después tocá Comparar.</p>
+      <ol class="steps">
+        <li><b>Resumen</b><span>Cuánto se pierde, dónde y si es manejo o agarre.</span></li>
+        <li><b>Curvas</b><span>G lateral, círculo de fricción y detalle por curva.</span></li>
+        <li><b>Motor</b><span>Dinamómetro de pista, subidas de RPM y cambios.</span></li>
+        <li><b>Vueltas</b><span>Evolución vuelta a vuelta, agua y velocidad.</span></li>
+      </ol>
+    </div>
+    <div id="report" hidden></div>
+  </main>
+</div>
+<script src="report.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

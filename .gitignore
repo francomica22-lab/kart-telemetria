@@ -1,0 +1,20 @@
+# nunca subir datos de tandas ni reportes
+*.xrk
+*.xrz
+*.drk
+*.rrk
+*.bak
+*.gpk
+*.mp4
+reportes/
+*.pkl
+*.csv
+
+# generados
+site/
+build/
+dist/
+*.spec
+__pycache__/
+*.zip
+notas.txt
