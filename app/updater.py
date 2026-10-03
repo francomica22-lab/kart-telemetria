@@ -83,6 +83,9 @@ def cleanup_old(current_dir):
                 shutil.rmtree(p, ignore_errors=True)
     except Exception:
         pass
+    # instalaciones viejas, anteriores al actualizador
+    for legacy in ("AnalisisKarting_v3", "AnalisisKartingApp"):
+        shutil.rmtree(os.path.join(os.path.dirname(APP_DIR), legacy), ignore_errors=True)
 
 
 def latest():
