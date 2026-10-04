@@ -75,11 +75,16 @@ def ensure_installed(version):
 
 
 def cleanup_old(current_dir):
-    """Borra versiones viejas (las que no esten en uso)."""
+    """Borra versiones viejas. Nunca toca la carpeta de version donde esta corriendo el programa
+    (el ejecutable puede estar en APP_DIR/<version>/ o en una subcarpeta de ella)."""
     try:
+        rel = os.path.relpath(current_dir, os.path.normcase(os.path.abspath(APP_DIR)))
+        mine = os.path.normcase(rel.split(os.sep)[0])
+        if mine in ("", ".", ".."):
+            return
         for name in os.listdir(APP_DIR):
             p = os.path.join(APP_DIR, name)
-            if os.path.normcase(os.path.abspath(p)) != current_dir and os.path.isdir(p):
+            if os.path.normcase(name) != mine and os.path.isdir(p) and name[:1].isdigit():
                 shutil.rmtree(p, ignore_errors=True)
     except Exception:
         pass
@@ -129,6 +134,12 @@ def download_and_install(info, progress=lambda f: None):
     dst = os.path.join(APP_DIR, info["version"])
     with zipfile.ZipFile(zpath) as z:
         z.extractall(dst)
+    # el zip trae la carpeta AnalisisKarting/: se aplana para que el .exe quede en APP_DIR/<version>/
+    inner = os.path.join(dst, "AnalisisKarting")
+    if os.path.isfile(os.path.join(inner, "AnalisisKarting.exe")):
+        for name in os.listdir(inner):
+            shutil.move(os.path.join(inner, name), os.path.join(dst, name))
+        shutil.rmtree(inner, ignore_errors=True)
     progress(0.95)
     # el zip puede traer una carpeta raiz
     exe = None
