@@ -47,7 +47,7 @@
       <div class="simple"></div>
       <div class="detalle">
       <div class="tabs" role="tablist">
-        ${[["Resumen", 0], ["Curvas", 1], ["Vuelta óptima", 4], ["Motor", 2], ["Transmisión", 5], ["Sensores", 6], ["Video", 7], ["Vueltas", 3]].map(([t, i], j) => `<button class="tab${j == 0 ? " on" : ""}" role="tab" data-t="${i}">${t}</button>`).join("")}
+        ${[["Resumen", 0], ["Circuito", 8], ["Curvas", 1], ["Vuelta óptima", 4], ["Motor", 2], ["Transmisión", 5], ["Sensores", 6], ["Video", 7], ["Vueltas", 3]].map(([t, i], j) => `<button class="tab${j == 0 ? " on" : ""}" role="tab" data-t="${i}">${t}</button>`).join("")}
       </div>
       <div class="pane" data-p="0"></div>
       <div class="pane" data-p="1" hidden></div>
@@ -57,6 +57,7 @@
       <div class="pane" data-p="5" hidden></div>
       <div class="pane" data-p="6" hidden></div>
       <div class="pane" data-p="7" hidden></div>
+      <div class="pane" data-p="8" hidden></div>
       </div>
     </div>`;
     // modo simple / detallado (se recuerda en este equipo)
@@ -329,7 +330,9 @@
         }).join("") + `</div>`;
       }).join("")}</div><p class="ink2 small" style="margin-top:8px">La barra más larga es la vuelta más rápida de cada tanda.</p></div>
       <p class="ink2 small">¿Querés ver el porqué de cada número? Pasá al <button class="link" data-go="detalle">análisis detallado</button>.</p>`;
+      if (D.circuito) h += `<div class="panel"><div class="eyebrow" style="margin-bottom:6px">El circuito</div><p>${esc(D.circuito.nombre || "")}: ${D.circuito.largo} m · ${D.circuito.curvas.length} curvas · ${D.circuito.v_media} km/h de promedio · agarre ${D.circuito.grip_nivel}. <button class="link" data-go2="8">Ver ficha</button></p></div>`;
       box.innerHTML = alertsHTML + h;
+      const g2 = box.querySelector("[data-go2]"); if (g2) g2.addEventListener("click", () => { setMode("detalle"); root.querySelector('.tab[data-t="8"]').click(); });
       box.querySelector("[data-go]").addEventListener("click", () => { setMode("detalle"); root.scrollIntoView(); });
       box.querySelectorAll(".sp-map svg").forEach(svg => {
         const id = svg.dataset.id, tp2 = tx.map((x, i) => MX(x).toFixed(1) + "," + MY(ty[i]).toFixed(1));
@@ -527,6 +530,7 @@
     P(5).innerHTML = KTX.transPane(ctx); KTX.wireTrans(ctx, P(5));
     P(6).innerHTML = KTX.sensorsPane(ctx); KTX.drawWater(ctx, P(6));
     P(7).innerHTML = KTX.videoPane(ctx); KTX.wireVideo(ctx, P(7));
+    P(8).innerHTML = KTX.circuitPane(ctx); KTX.wireCircuit(ctx, P(8));
 
     /* ================= VUELTAS ================= */
     P(3).innerHTML = `

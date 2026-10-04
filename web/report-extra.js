@@ -452,5 +452,74 @@
     });
   }
 
-  window.KTX = { audioSpectrum, spectralSync, setupDiff, setupChips, setupModal, climaTxt, optimoPane, simpleOptimo, optimoTips, lapTrend, powerPanel, drawPower, hpDelta, transPane, wireTrans, sensorsPane, drawWater, videoPane, wireVideo, store };
+  /* ---------- ficha del circuito ---------- */
+  const CTIPO = { lenta: "var(--s2)", media: "var(--s4)", "rápida": "var(--s3)" };
+  function circuitKey(c) { return c.lat != null ? `${c.lat.toFixed(2)}_${c.lon.toFixed(2)}` : (c.nombre || "pista"); }
+  function circuitSummary(c) {
+    const ritmo = c.v_media < 80 ? "lento" : c.v_media < 95 ? "de velocidad media" : "rápido";
+    const horq = c.curvas.filter(x => x.forma == "horquilla").length;
+    const tecnico = horq >= 2 || c.n_lentas >= c.curvas.length / 2;
+    return `Circuito ${ritmo}${tecnico ? " y técnico" : ""}: ${c.curvas.length} curvas${horq ? `, ${horq} horquilla${horq > 1 ? "s" : ""}` : ""}, recta más larga de ${c.recta_max} m. Sentido ${c.sentido_giro} (${c.n_izq} a la izquierda, ${c.n_der} a la derecha).`;
+  }
+  function circuitHints(c) {
+    const h = [];
+    if (c.n_lentas >= c.curvas.length / 2) h.push("Muchas salidas de curva lentas: suele convenir una relación más corta y un kart que gire bien en las horquillas.");
+    if (c.recta_max >= 250) h.push("Rectas largas: la velocidad final pesa; suele convenir una relación más larga y poco arrastre.");
+    if (c.pct_frenando >= 18) h.push(`Se frena el ${c.pct_frenando}% del tiempo: la estabilidad en frenada y la entrada a curva son clave.`);
+    if (c.grip_nivel == "alto") h.push("Mucho agarre lateral: el kart puede trabarse; vigilar que no salte en las horquillas.");
+    if (c.grip_nivel == "bajo") h.push("Poco agarre: priorizar que el kart traccione y no deslice en la salida.");
+    return h;
+  }
+  function circuitPane(ctx) {
+    const c = ctx.D.circuito; if (!c) return `<div class="panel"><p class="muted">Sin datos del circuito.</p></div>`;
+    const kpi = (k, v, sub) => `<div><div class="eyebrow">${k}</div><div class="big">${v}</div>${sub ? `<div class="muted small">${sub}</div>` : ""}</div>`;
+    const hints = circuitHints(c);
+    return `<div class="panel"><h2>${esc(c.nombre || "Circuito")}</h2>
+      <p class="ink2">Ficha armada con la vuelta de referencia (trazado) y todas las vueltas elegidas (agarre). El agarre depende de gomas, día y temperatura: con más tandas el dato es más firme.</p>
+      <div class="optrow six">
+        ${kpi("Largo", `${c.largo} m`)}${kpi("Velocidad media", `${c.v_media} km/h`, `máx ${c.v_max} · mín ${c.v_min}`)}
+        ${kpi("Curvas", c.curvas.length, `${c.n_lentas} lentas · ${c.n_medias} medias · ${c.n_rapidas} rápidas`)}
+        ${kpi("Agarre", `${c.grip_g.toFixed(2)} g`, `nivel ${c.grip_nivel}`)}
+        ${kpi("Acelerando", `${c.pct_acelerando}%`, "de la vuelta")}${kpi("Frenando", `${c.pct_frenando}%`, "de la vuelta")}
+      </div>
+      <p class="lead" style="margin-top:12px">${esc(circuitSummary(c))}</p></div>
+      <div class="grid2">
+        <div class="panel"><h2>Curvas</h2><p class="ink2">Tipo según la velocidad mínima (lenta menos de 65 km/h, media menos de 85, rápida). Forma según cuánto gira: horquilla 135° o más, cerrada 75° a 135°, abierta menos. Radio estimado con velocidad y G en el vértice.</p>
+          <div class="tw"><table><thead><tr><th>Curva</th><th>Lado</th><th>Forma</th><th>Radio</th><th>V mín</th><th>G lat</th><th>Frenada</th></tr></thead><tbody>
+          ${c.curvas.map(x => `<tr title="${x.tipo} · ${x.sentido}"><td><span class="dot" style="--c:${CTIPO[x.tipo]}"></span>C${x.n}</td><td>${x.sentido == "izquierda" ? "izq" : "der"}</td><td>${x.forma} ${x.giro}°</td><td>${x.radio} m</td><td>${x.v_min} km/h</td><td>${x.lat_max ?? "–"} g</td><td>${x.frenada_g ?? "–"} g</td></tr>`).join("")}
+          </tbody></table></div>
+          <p class="small ink2" style="margin-top:8px">Rectas: ${c.rectas.map(r => `${r.largo} m (${r.v_max} km/h)`).join(" · ") || "sin rectas largas"}</p></div>
+        <div class="panel"><div class="eyebrow">Tipo de curva</div><svg class="cmap" viewBox="-30 -20 360 380"></svg>
+          <div class="sp-leg"><span class="lt" style="--c:var(--s2)">lenta</span><span class="lt" style="--c:var(--s4)">media</span><span class="lt" style="--c:var(--s3)">rápida</span></div></div>
+      </div>
+      ${hints.length ? `<div class="panel"><h2>Qué suele pedir un circuito así</h2><p class="ink2">Orientativo, sacado de las características de la pista. No reemplaza probar en el kart.</p><ul class="why">${hints.map(h => `<li>${h}</li>`).join("")}</ul></div>` : ""}
+      <div class="panel"><h2>Circuitos parecidos</h2><p class="ink2">Cada circuito que analizás queda guardado en este equipo con su huella (largo, velocidad media, curvas lentas, porcentaje acelerando, recta más larga). Así, cuando vayas a una pista nueva, ves a cuál se parece.</p><div class="csim"></div></div>`;
+  }
+  function wireCircuit(ctx, root) {
+    const c = ctx.D.circuito; if (!c) return;
+    const { D } = ctx, tx = D.track.x, ty = D.track.y, L = D.track.L, svg = root.querySelector(".cmap");
+    const minx = Math.min(...tx), maxx = Math.max(...tx), miny = Math.min(...ty), maxy = Math.max(...ty), k2 = Math.min(260 / (maxx - minx), 300 / (maxy - miny));
+    const MX = x => 20 + (x - minx) * k2, MY = y => 20 + (maxy - y) * k2, idxAt = s => Math.min(tx.length - 1, Math.max(0, Math.round(s / L * (tx.length - 1))));
+    const tp = tx.map((x, i) => MX(x).toFixed(1) + "," + MY(ty[i]).toFixed(1));
+    el("polyline", { points: tp.join(" "), fill: "none", stroke: "var(--muted)", "stroke-width": 4, "stroke-linejoin": "round", opacity: .6 }, svg);
+    for (const k of D.corners) {
+      const cc = c.curvas.find(x => x.n == k.n); if (!cc) continue;
+      el("polyline", { points: tp.slice(idxAt(k.sa - 35), idxAt(k.sa + 35) + 1).join(" "), fill: "none", stroke: CTIPO[cc.tipo], "stroke-width": 7, "stroke-linecap": "round", "stroke-linejoin": "round" }, svg);
+      const i = idxAt(k.sa);
+      el("circle", { cx: MX(tx[i]), cy: MY(ty[i]), r: 11, fill: "var(--panel)", stroke: "var(--ink2)" }, svg);
+      txt(svg, MX(tx[i]), MY(ty[i]) + 4, k.n, { "text-anchor": "middle", style: "fill:var(--ink);font-weight:600" });
+    }
+    txt(svg, MX(tx[0]) - 14, MY(ty[0]) + 5, "★", { "text-anchor": "middle", style: "fill:var(--ink);font-size:15px" });
+    // guardar y comparar circuitos
+    const db = store.get("kt-circuitos", {}), key = circuitKey(c), today = (ctx.D.sessions[0] || {}).date || "";
+    db[key] = { nombre: c.nombre, fecha: today, huella: c.huella, largo: c.largo, v_media: c.v_media, curvas: c.curvas.length, grip: c.grip_g, resumen: circuitSummary(c) };
+    store.set("kt-circuitos", db);
+    const others = Object.entries(db).filter(([k]) => k != key).map(([k, v]) => {
+      const d = Math.sqrt(v.huella.reduce((a, x, i) => a + (x - c.huella[i]) ** 2, 0) / c.huella.length);
+      return Object.assign({ sim: Math.max(0, Math.round((1 - d / 0.35) * 100)) }, v);
+    }).sort((a, b) => b.sim - a.sim);
+    root.querySelector(".csim").innerHTML = others.length ? `<div class="tw"><table><thead><tr><th>Circuito</th><th>Parecido</th><th>Largo</th><th>V media</th><th>Curvas</th><th>Agarre</th></tr></thead><tbody>${others.map(o => `<tr title="${esc(o.resumen)}"><td>${esc(o.nombre || "–")}</td><td class="${o.sim >= 75 ? "g" : ""}">${o.sim}%</td><td>${o.largo} m</td><td>${o.v_media} km/h</td><td>${o.curvas}</td><td>${o.grip} g</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted small">Todavía no hay otros circuitos guardados. Cuando analices tandas de otra pista, aparece acá cuánto se parece a ${esc(c.nombre || "esta")}.</p>`;
+  }
+
+  window.KTX = { circuitPane, wireCircuit, circuitSummary, audioSpectrum, spectralSync, setupDiff, setupChips, setupModal, climaTxt, optimoPane, simpleOptimo, optimoTips, lapTrend, powerPanel, drawPower, hpDelta, transPane, wireTrans, sensorsPane, drawWater, videoPane, wireVideo, store };
 })();

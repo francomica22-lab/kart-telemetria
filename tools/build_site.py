@@ -8,7 +8,7 @@ VERSION = open(os.path.join(ROOT, "VERSION"), encoding="utf8").read().strip()
 shutil.rmtree(OUT, ignore_errors=True)
 shutil.copytree(os.path.join(ROOT, "web"), OUT, dirs_exist_ok=True)
 os.makedirs(os.path.join(OUT, "app"), exist_ok=True)
-for m in ("kartlib", "motor", "tandas", "sesiones", "setup_kart"):
+for m in ("kartlib", "motor", "tandas", "sesiones", "setup_kart", "circuito"):
     shutil.copy(os.path.join(ROOT, "app", f"{m}.py"), os.path.join(OUT, "app"))
 idx = os.path.join(OUT, "index.html")
 html = open(idx, encoding="utf8").read().replace("__VERSION__", VERSION)

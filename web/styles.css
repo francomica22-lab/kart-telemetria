@@ -302,3 +302,10 @@ input[type=range]{padding:0;background:none;border:none;accent-color:var(--ink)}
 .info{display:inline-grid;place-items:center;width:18px;height:18px;margin-left:8px;border-radius:50%;border:1px solid var(--line);background:none;color:var(--muted);font:600 11px var(--mono);cursor:pointer;vertical-align:middle}
 .info:hover,.info.on{color:var(--ink);border-color:var(--ink2)}
 p.help{font-size:13px;color:var(--ink2);margin:4px 0 8px;max-width:85ch}
+
+/* ficha del circuito */
+.optrow.six{grid-template-columns:repeat(6,minmax(0,1fr))}
+@media (max-width:1300px){.optrow.six{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.cmap{max-width:320px;margin:6px auto 0}
+.sp-leg .lt::before{background:var(--c)}
+.tab{padding:9px 11px 10px;letter-spacing:.06em;font-size:13px}

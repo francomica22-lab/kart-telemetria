@@ -12,6 +12,7 @@ from scipy.spatial import cKDTree
 from kartlib import *
 import motor
 import setup_kart
+import circuito
 
 POOL_TOL = 1.07   # vueltas que entran al analisis: hasta 7% mas lentas que la mejor de la tanda
 
@@ -248,6 +249,8 @@ def build_data(paths, top=3, bands=None, log=print):
     for s in out["sessions"]:
         s["ideal"] = round(sum(c["by"][s["id"]]["best_sector"] for c in out["corners"]), 3)
     out["sectors"] = sectors(rdf, sec_traces, ref.length)
+    out["circuito"] = circuito.circuit_profile(rdf, corners, R, [d for tr, _ in sec_traces.values() for d in tr.values()], float(ref_lap.time))
+    out["circuito"].update(nombre=S[ref_id].get("venue"), lat=S[ref_id].get("lat0"), lon=S[ref_id].get("lon0"))
     out["optimo"] = {sid: optimal(R[R.ses == sid], S[sid], rap_by[sid]) for sid in S}
     out["setup_fields"] = [list(f) for f in setup_kart.FIELDS]
     out["motor"] = motor.analyze(S, rap_by, ref_id, ref.length, corners, bands)
