@@ -25,7 +25,7 @@ Compará tandas de la **AiM MyChron** (archivos `.xrk`) curva por curva: cuánto
 
 La app comparte un resumen anónimo de cada tanda analizada (activado por defecto, se desactiva en *Ajustes del análisis*):
 circuito (ubicación aproximada, largo, curvas), kart (categoría, chasis, motor), setup, clima, mejor tiempo y resultados del análisis.
-**Nunca** se envían vueltas, telemetría, archivos, nombres ni comentarios libres. La base (Supabase) solo permite agregar resúmenes: no se pueden leer ni modificar desde la app.
+**Nunca** se envían vueltas, telemetría, archivos, nombres ni comentarios libres. La base (Supabase) solo permite agregar resúmenes: no se pueden leer ni modificar desde la app. Política completa: https://francomica22-lab.github.io/kart-telemetria/privacidad.html
 
 ## Estructura
 

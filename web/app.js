@@ -281,7 +281,7 @@
         <h1>Compará tus tandas, curva por curva</h1>
         <p>Elegí la carpeta con tus archivos <b>.xrk</b> (los que descarga Race Studio 3), tocá dos tandas y compará.
         Te dice cuánto perdés, en qué curva, si es manejo o agarre, y cómo rindió el motor.</p>
-        <p class="ink2">Todo se calcula en tu navegador: tus archivos no se suben a ningún lado.</p>
+        <p class="ink2">Todo se calcula en tu navegador: tus archivos no se suben a ningún lado. <a href="privacidad.html" target="_blank" rel="noopener" style="color:var(--ink2)">Privacidad</a></p>
         <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px"><button class="btn primary" style="width:auto" id="pick3">Elegir carpeta de tandas</button>
         <a class="btn" style="text-decoration:none;padding:11px 14px" href="${DOWNLOAD}">Descargar programa para Windows</a></div>
         <ol class="steps">

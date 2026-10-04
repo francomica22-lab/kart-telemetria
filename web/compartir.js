@@ -7,7 +7,9 @@
   const store = { get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } } };
 
   const enabled = () => store.get("kt-share", true) !== false;
-  const setEnabled = v => store.set("kt-share", !!v);
+  const PRIV = "https://francomica22-lab.github.io/kart-telemetria/privacidad.html";
+  // al desactivar se descarta lo que estuviera esperando para enviarse
+  const setEnabled = v => { store.set("kt-share", !!v); if (!v) store.set("kt-share-queue", []); };
   function device() {
     let id = store.get("kt-device", null);
     if (!id) { id = (crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c => (c ^ Math.random() * 16 >> c / 4).toString(16))); store.set("kt-device", id); }
@@ -89,7 +91,8 @@
     const d = document.createElement("div"); d.className = "modal";
     d.innerHTML = `<div class="mbox" role="dialog" aria-modal="true" aria-labelledby="sh-t"><h2 id="sh-t">Datos anónimos</h2><p class="ink2 small">${AVISO}</p>
       <label class="toggle"><input type="checkbox" id="sh-on" ${enabled() ? "checked" : ""}><span>Compartir datos anónimos</span></label>
-      <p class="muted small">Lo podés cambiar cuando quieras en Ajustes del análisis.</p>
+      <p class="muted small">Lo podés cambiar cuando quieras en Ajustes del análisis. <a href="${PRIV}" target="_blank" rel="noopener">Política de privacidad</a></p>
+      <p class="muted small">Identificador anónimo de este equipo (para pedir que se borren tus envíos): <span class="num" style="user-select:all">${device()}</span></p>
       <div class="mact"><button class="btn primary" id="sh-ok">Listo</button></div></div>`;
     document.body.appendChild(d);
     d.querySelector("#sh-ok").addEventListener("click", () => {
@@ -97,5 +100,5 @@
       document.dispatchEvent(new CustomEvent("kt-share-change"));
     });
   }
-  window.KTS = { enabled, setEnabled, share, flush, notice, buildRecords };
+  window.KTS = { PRIV, device, enabled, setEnabled, share, flush, notice, buildRecords };
 })();

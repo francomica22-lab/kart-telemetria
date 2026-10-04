@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacidad · Análisis Karting</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  html,body{height:auto}
+  body{overflow:auto}
+  .doc{max-width:760px;margin:0 auto;padding:40px 20px 80px;display:grid;gap:18px}
+  .doc h1{font-size:34px}
+  .doc h2{font-size:20px;margin-top:10px}
+  .doc p,.doc li{font-size:15px;line-height:1.65;color:var(--ink2);max-width:none}
+  .doc ul{margin:0;padding-left:20px;display:grid;gap:6px}
+  .doc b{color:var(--ink)}
+  .doc a{color:var(--ink)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:640px){.two{grid-template-columns:1fr}}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px}
+  .box h3{font-size:15px;margin-bottom:6px}
+  .box.no{border-color:color-mix(in srgb,var(--good) 40%,var(--line))}
+</style>
+</head>
+<body>
+<main class="doc">
+  <div class="eyebrow">Análisis Karting</div>
+  <h1>Política de privacidad</h1>
+  <p class="muted">Última actualización: 4 de octubre de 2026</p>
+
+  <p>Análisis Karting es una herramienta para analizar los archivos <b>.xrk</b> de la AiM MyChron. Esta página explica qué datos usa, cuáles comparte y cómo podés desactivarlo o pedir que se borren. Está escrita para que se entienda: si algo no queda claro, escribinos.</p>
+
+  <h2>Tus archivos se quedan en tu equipo</h2>
+  <p>El análisis se hace en tu computadora: en el programa de Windows y también en la versión web, que corre dentro de tu navegador. <b>Tus archivos .xrk, tus vueltas y tu telemetría nunca se suben a ningún servidor.</b></p>
+  <p>En tu equipo se guardan algunas preferencias para que no tengas que cargarlas cada vez: la carpeta de tandas, el setup que cargues (en un archivo junto a cada tanda, o en el navegador si usás la web), la identificación de cada kart, la relación por circuito, el clima ya consultado y los circuitos analizados. Podés borrarlos eliminando esos archivos o los datos del sitio en tu navegador.</p>
+
+  <h2>Datos anónimos compartidos</h2>
+  <p>Para construir una base de circuitos y setups que permita, más adelante, dar sugerencias, la app comparte <b>un resumen anónimo de cada tanda que analizás</b>. Viene <b>activado</b> y lo podés desactivar cuando quieras.</p>
+  <div class="two">
+    <div class="box"><h3>Qué se comparte</h3><ul>
+      <li>El circuito: ubicación aproximada (redondeada a unos 1.000 m), nombre, largo y forma de las curvas.</li>
+      <li>El kart: categoría, chasis y motor, y el nombre que le pone la MyChron (por ejemplo "PANTANO DD2").</li>
+      <li>El setup cargado (presiones, trocha, relación, etc.), <b>sin las notas libres</b>.</li>
+      <li>El clima de la tanda, la fecha y la hora.</li>
+      <li>El mejor tiempo, el promedio y la cantidad de vueltas.</li>
+      <li>Resultados del análisis: potencia estimada, agarre, fallas de motor detectadas.</li>
+      <li>La versión de la app y un identificador aleatorio de tu equipo.</li>
+    </ul></div>
+    <div class="box no"><h3>Qué nunca se comparte</h3><ul>
+      <li>Tus vueltas, la telemetría o los archivos .xrk.</li>
+      <li>Tu nombre ni el nombre del piloto.</li>
+      <li>Los comentarios y notas libres.</li>
+      <li>Tu ubicación ni ningún dato de tu computadora.</li>
+      <li>Videos.</li>
+    </ul></div>
+  </div>
+  <p>El <b>identificador del equipo</b> es un código al azar que genera la app la primera vez (no sale de tu nombre, tu mail ni tu computadora). Sirve solo para evitar duplicados y para que puedas pedir que se borren tus envíos. Lo ves en la app, en <i>Ajustes del análisis → qué se comparte</i>.</p>
+
+  <h2>Para qué se usan</h2>
+  <ul>
+    <li>Armar una base de circuitos (largo, tipo de curvas, agarre) para encontrar pistas parecidas.</li>
+    <li>Entender qué setups y relaciones se usan en cada tipo de circuito y categoría, para dar sugerencias en futuras versiones.</li>
+    <li>Mejorar el análisis (por ejemplo, la detección de fallas de motor).</li>
+  </ul>
+  <p>No se venden ni se ceden a terceros. Si en el futuro se publican estadísticas, serán agregadas (por ejemplo, "relación más usada en Sunchales en DD2") y nunca permitirán identificar a una persona.</p>
+
+  <h2>Cómo desactivarlo</h2>
+  <p>En la app: <i>Ajustes del análisis → Compartir datos anónimos</i>. También aparece en el aviso que se muestra la primera vez. Desactivado, la app deja de enviar de inmediato; lo que estuviera esperando sin enviar (por falta de internet) se descarta.</p>
+
+  <h2>Dónde se guardan y por cuánto tiempo</h2>
+  <p>Los resúmenes se guardan en una base de datos de <b>Supabase</b>, con servidores en São Paulo, Brasil. La base solo permite agregar registros: nadie puede leerlos ni modificarlos desde la app; solo el responsable del proyecto accede para analizarlos. Se conservan mientras sirvan para los fines de arriba; podés pedir que se borren en cualquier momento.</p>
+
+  <h2>Otros servicios que usa la app</h2>
+  <ul>
+    <li><b>Open-Meteo</b> (clima): para traer el clima de la tanda se le envía la ubicación aproximada del circuito y la fecha. No se envía nada tuyo.</li>
+    <li><b>FormSubmit</b> (reportes): si usás "Reportar un problema", lo que escribas y, si lo dejás marcado, datos técnicos (versión, navegador, tandas elegidas y el último error) llegan por mail al responsable.</li>
+    <li><b>GitHub</b> (descargas y actualizaciones) y <b>jsDelivr</b> (librerías de la versión web): como cualquier sitio, registran la dirección IP de quien descarga.</li>
+  </ul>
+  <p>La app no usa cookies de seguimiento ni publicidad.</p>
+
+  <h2>Tus derechos</h2>
+  <p>Podés pedir acceder, corregir o borrar los resúmenes enviados desde tu equipo, indicando el identificador del equipo. También podés pedir que se borren todos los datos asociados a ese identificador. Respondemos dentro de los plazos de la ley: 10 días corridos para el acceso y 5 días hábiles para corregir o borrar.</p>
+  <p>Este proyecto se rige por la Ley 25.326 de Protección de los Datos Personales de la República Argentina. Si considerás que no respetamos tus derechos, podés presentar un reclamo ante la <b>Agencia de Acceso a la Información Pública</b> (AAIP), autoridad de control de la ley.</p>
+
+  <h2>Contacto</h2>
+  <p>Responsable: Franco Mica · <span class="num">franco.mica22@gmail.com</span><br>También podés escribir desde la app con "Reportar un problema".</p>
+
+  <h2>Cambios</h2>
+  <p>Si esta política cambia, se actualiza esta página y la fecha de arriba. Si el cambio amplía los datos que se comparten, la app lo avisa antes de enviar nada nuevo.</p>
+</main>
+</body>
+</html>
