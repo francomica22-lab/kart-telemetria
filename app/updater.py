@@ -42,11 +42,17 @@ def shortcut_paths():
 
 
 def make_shortcuts(target):
-    """Crea/actualiza los accesos directos con PowerShell (sin dependencias)."""
+    """Crea/actualiza los accesos directos (Escritorio, menu Inicio) y repunta los anclados a la barra de tareas
+    que apunten a una version vieja del programa. PowerShell, sin dependencias."""
+    wd = os.path.dirname(target)
     lines = ["$ws = New-Object -ComObject WScript.Shell"]
     for lnk in shortcut_paths():
         lines.append(f"$s = $ws.CreateShortcut('{lnk}'); $s.TargetPath = '{target}'; "
-                     f"$s.WorkingDirectory = '{os.path.dirname(target)}'; $s.IconLocation = '{target},0'; $s.Save()")
+                     f"$s.WorkingDirectory = '{wd}'; $s.IconLocation = '{target},0'; $s.Save()")
+    pinned = os.path.join(os.environ.get("APPDATA", ""), "Microsoft", "Internet Explorer", "Quick Launch", "User Pinned", "TaskBar")
+    lines.append(f"Get-ChildItem -LiteralPath '{pinned}' -Filter *.lnk -ErrorAction SilentlyContinue | ForEach-Object {{ "
+                 f"$s = $ws.CreateShortcut($_.FullName); if ($s.TargetPath -like '*AnalisisKarting*AnalisisKarting.exe' -and $s.TargetPath -ne '{target}') "
+                 f"{{ $s.TargetPath = '{target}'; $s.WorkingDirectory = '{wd}'; $s.IconLocation = '{target},0'; $s.Save() }} }}")
     subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", "; ".join(lines)],
                    creationflags=0x08000000, timeout=30)  # CREATE_NO_WINDOW
 
@@ -58,11 +64,22 @@ def ensure_installed(version):
         return False
     here = os.path.normcase(os.path.abspath(exe_dir()))
     if here.startswith(os.path.normcase(os.path.abspath(APP_DIR))):
-        target = sys.executable
-        for lnk in shortcut_paths():
-            if not os.path.exists(lnk):
-                make_shortcuts(target)
-                break
+        # una vez por version (en segundo plano): accesos directos y anclados apuntando a esta version
+        mark = os.path.join(os.environ.get("APPDATA", ""), "AnalisisKarting", "accesos.txt")
+        try:
+            done = open(mark, encoding="utf8").read().strip()
+        except Exception:
+            done = ""
+        if done != f"{version}|{sys.executable}" or not all(os.path.exists(l) for l in shortcut_paths()):
+            def fix():
+                try:
+                    make_shortcuts(sys.executable)
+                    os.makedirs(os.path.dirname(mark), exist_ok=True)
+                    open(mark, "w", encoding="utf8").write(f"{version}|{sys.executable}")
+                except Exception:
+                    pass
+            import threading
+            threading.Thread(target=fix, daemon=True).start()
         cleanup_old(here)
         return False
     dst = os.path.join(APP_DIR, version)
