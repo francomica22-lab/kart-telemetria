@@ -20,6 +20,7 @@
     if (on && !b) { b = document.createElement("div"); b.className = "busy"; b.innerHTML = `<div class="spin"></div><div class="ink2"></div>`; $("main").appendChild(b); }
     if (b) { if (on) b.lastChild.textContent = msg || "Analizando…"; else b.remove(); }
   }
+  const KT_status = m => { const b = document.querySelector(".busy .ink2"); if (b) b.textContent = m; };
   const colorOf = p => { const i = sel.indexOf(p); return i < 0 ? null : PAL[i % PAL.length]; };
 
   const label = r => r.mejor_n ? r.mejor : "sin vueltas";
@@ -50,12 +51,12 @@
 
   function renderTray() {
     const n = sel.length;
-    $("go").disabled = n < 2;
-    $("go").textContent = n >= 2 ? `Comparar ${n} tandas` : "Comparar";
-    if (!n) { $("tray").innerHTML = `<span class="muted">Tocá dos o más tandas de la lista.</span>`; return; }
+    $("go").disabled = n < 1;
+    $("go").textContent = n >= 2 ? `Comparar ${n} tandas` : n == 1 ? "Analizar esta tanda" : "Comparar";
+    if (!n) { $("tray").innerHTML = `<span class="muted">Tocá una tanda para analizarla, o dos o más para compararlas.</span>`; return; }
     const pistas = new Set(sel.map(p => (rowOf(p) || {}).pista));
     $("tray").innerHTML = sel.map(p => `<span class="tchip" style="--c:${colorOf(p)}">${esc(label(rowOf(p) || {}))} <small>${esc((rowOf(p) || {}).hora || "")}</small><button data-rm="${esc(p)}" title="Quitar">×</button></span>`).join("") +
-      (n == 1 ? `<span class="muted">Elegí una más.</span>` : "") +
+      (n == 1 ? `<span class="muted">o elegí otra para comparar</span>` : "") +
       (pistas.size > 1 ? `<span class="warnline">Configuraciones de pista distintas (${[...pistas].map(esc).join(", ")}). Sirve si el trazado es el mismo.</span>` : "");
   }
 
@@ -123,6 +124,54 @@
   }
   $("reload").addEventListener("click", scan);
 
+  /* ---------- clima (Open-Meteo, gratis, sin clave) ---------- */
+  async function addWeather(D) {
+    D.clima = {};
+    await Promise.all(D.sessions.map(async s => {
+      if (s.lat0 == null || !s.date || s.date.length != 10) return;
+      const iso = `${s.date.slice(6)}-${s.date.slice(0, 2)}-${s.date.slice(3, 5)}`;
+      const key = `kt-clima-${iso}-${s.lat0.toFixed(2)}-${s.lon0.toFixed(2)}`;
+      let j = null; try { j = JSON.parse(localStorage.getItem(key)); } catch (e) { }
+      if (!j) {
+        const days = (Date.now() - Date.parse(iso)) / 864e5;
+        const base = days < 80 ? "https://api.open-meteo.com/v1/forecast" : "https://archive-api.open-meteo.com/v1/archive";
+        const url = `${base}?latitude=${s.lat0.toFixed(4)}&longitude=${s.lon0.toFixed(4)}&hourly=temperature_2m,relative_humidity_2m,surface_pressure,wind_speed_10m,wind_direction_10m&start_date=${iso}&end_date=${iso}&timezone=auto`;
+        const ctl = new AbortController(); const tm = setTimeout(() => ctl.abort(), 6000);
+        try {
+          const r = await fetch(url, { signal: ctl.signal });
+          if (r.ok) { j = await r.json(); if (j.hourly && j.hourly.temperature_2m.some(x => x != null)) { if (days > 2) try { localStorage.setItem(key, JSON.stringify(j)); } catch (e) { } } else j = null; }
+        } catch (e) { j = null; } finally { clearTimeout(tm); }
+      }
+      if (!j) return;
+      const [h, m] = (s.hour || "12:00").split(":").map(Number), x = Math.min(22.99, h + m / 60), H = j.hourly, i = Math.floor(x), fr = x - i;
+      const lerp = k => H[k][i] == null ? null : H[k][i] + ((H[k][i + 1] ?? H[k][i]) - H[k][i]) * fr;
+      const T = lerp("temperature_2m"), RH = lerp("relative_humidity_2m"), P = lerp("surface_pressure");
+      if (T == null || RH == null || P == null) return;
+      const es = 6.1078 * Math.pow(10, 7.5 * T / (T + 237.3)), pv = RH / 100 * es, pd = P - pv;
+      const rho = pd * 100 / (287.05 * (T + 273.15)) + pv * 100 / (461.495 * (T + 273.15));
+      D.clima[s.id] = { T, RH, P, W: lerp("wind_speed_10m") || 0, WD: H.wind_direction_10m[Math.round(x)], rho };
+    }));
+  }
+
+  /* ---------- setup: escritorio guarda junto al .xrk; web guarda en este navegador ---------- */
+  const setupKey = s => `kt-setup-${(s.path || "").split(/[\\/]/).pop()}`;
+  function applyWebSetups(D) {
+    for (const s of D.sessions) {
+      let m = null; try { m = JSON.parse(localStorage.getItem(setupKey(s))); } catch (e) { }
+      if (m) { s.setup = s.setup || {}; s.setup.manual = m; s.setup.valores = Object.assign({}, s.setup.auto || {}, m); }
+    }
+  }
+  async function saveSetup(s, vals) {
+    if (IS_WEB) { try { localStorage.setItem(setupKey(s), JSON.stringify(vals)); } catch (e) { return { error: "No se pudo guardar en este navegador." }; } toast("Setup guardado en este navegador."); return { valores: vals }; }
+    const r = await api().save_setup(s.path, vals);
+    if (!r.error) toast("Setup guardado junto al archivo de la tanda.");
+    return r;
+  }
+  async function exportReport() {
+    const r = await api().export_html();
+    if (r && r.path) toast(IS_WEB ? "Reporte descargado: " + r.path : "Reporte guardado en " + r.path); else if (r && r.error) toast(r.error, true);
+  }
+
   $("go").addEventListener("click", async () => {
     const bands = [[+$("b1a").value, +$("b1b").value], [+$("b2a").value, +$("b2b").value]].filter(b => b[0] > 0 && b[1] > b[0]);
     const opts = { top: Math.max(1, Math.min(5, +$("top").value || 3)), bands };
@@ -131,17 +180,12 @@
       const res = await api().compare(sel, opts);
       if (res.error) { toast(res.error, true); return; }
       last = res.data;
+      if (IS_WEB) applyWebSetups(last);
+      KT_status("Buscando el clima de cada tanda…");
+      await addWeather(last);
       const colors = {}; sel.forEach((p, i) => { const r = rowOf(p); if (r) colors[r.id] = PAL[i % PAL.length]; });
       $("empty").hidden = true; $("report").hidden = false;
-      renderReport(last, $("report"), { colors });
-      const exp = document.createElement("button");
-      exp.className = "btn"; exp.textContent = "Exportar reporte HTML";
-      exp.addEventListener("click", async () => {
-        const r = await api().export_html();
-        if (r && r.path) toast(IS_WEB ? "Reporte descargado: " + r.path : "Reporte guardado en " + r.path); else if (r && r.error) toast(r.error, true);
-      });
-      const head = $("report").querySelector(".rep-head");
-      const box = document.createElement("div"); box.className = "rep-actions"; box.append(head.lastElementChild, exp); head.appendChild(box);
+      renderReport(last, $("report"), { colors, saveSetup, onExport: exportReport });
       $("main").scrollTop = 0;
     } catch (e) { toast("Error: " + (e.message || e), true); }
     finally { busy(false); }
@@ -177,6 +221,44 @@
       else { d.querySelector(".bar i").style.width = "100%"; $("ust").textContent = "Listo. Abriendo la versión nueva…"; }
     });
   }
+
+  /* ---------- reportar un problema (llega por mail via FormSubmit) ---------- */
+  const REPORT_URL = "https://formsubmit.co/ajax/franco.mica22@gmail.com";
+  window.addEventListener("error", e => { window.KT_LAST_ERROR = String(e.message || e.error || ""); });
+  window.addEventListener("unhandledrejection", e => { window.KT_LAST_ERROR = String((e.reason && e.reason.message) || e.reason || ""); });
+  function reportDialog() {
+    const d = document.createElement("div"); d.className = "modal";
+    d.innerHTML = `<form class="mbox" role="dialog" aria-modal="true" aria-labelledby="rt"><h2 id="rt">Reportar un problema</h2>
+      <p class="ink2 small">Contanos qué pasó o qué te gustaría que mejore. Le llega directo a quien desarrolla la app.</p>
+      <label for="rp-msg" class="small">Qué pasó</label><textarea id="rp-msg" rows="5" required placeholder="Ej.: elegí dos tandas de Zárate y no aparece la curva 3…"></textarea>
+      <label for="rp-who" class="small">Tu nombre o contacto (opcional)</label><input id="rp-who" autocomplete="name">
+      <label class="toggle small"><input type="checkbox" id="rp-tech" checked><span>Incluir datos técnicos (versión, tandas elegidas, último error)</span></label>
+      <p class="small" id="rp-st"></p>
+      <div class="mact"><button type="button" class="btn" id="rp-cancel">Cancelar</button><button type="submit" class="btn primary">Enviar</button></div></form>`;
+    document.body.appendChild(d);
+    d.querySelector("#rp-cancel").addEventListener("click", () => d.remove());
+    d.querySelector("form").addEventListener("submit", async e => {
+      e.preventDefault();
+      const msg = d.querySelector("#rp-msg").value.trim(); if (!msg) return;
+      const tech = d.querySelector("#rp-tech").checked ? [
+        `Versión: ${VERSION} (${IS_WEB ? "web" : "escritorio"})`, `Navegador: ${navigator.userAgent}`,
+        `Tandas elegidas: ${sel.map(p => { const r = rowOf(p) || {}; return `${r.mejor} ${r.fecha} ${r.hora} ${r.pista} (#${r.id})`; }).join("; ") || "ninguna"}`,
+        `Último error: ${window.KT_LAST_ERROR || "ninguno"}`].join("\n") : "";
+      const st = d.querySelector("#rp-st"); st.textContent = "Enviando…"; st.className = "small ink2";
+      try {
+        const r = await fetch(REPORT_URL, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ _subject: `Análisis Karting · reporte (${IS_WEB ? "web" : "escritorio"} ${VERSION})`, _template: "box", nombre: d.querySelector("#rp-who").value.trim() || "anónimo", mensaje: msg, datos_tecnicos: tech }) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || j.success === "false" || j.success === false) throw new Error(j.message || "error");
+        d.remove(); toast("¡Gracias! El reporte se envió.");
+      } catch (err) {
+        st.className = "small b";
+        st.textContent = "No se pudo enviar (¿sin internet?). Copiá el texto y mandalo por WhatsApp.";
+        try { await navigator.clipboard.writeText(msg + (tech ? "\n\n" + tech : "")); st.textContent += " Ya lo copié al portapapeles."; } catch (e2) { }
+      }
+    });
+  }
+  $("report-btn").addEventListener("click", reportDialog);
 
   async function boot() {
     try {

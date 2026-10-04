@@ -16,6 +16,9 @@ CH = {  # canal -> nombre corto
     "GPS Longitude": "lon",
 }
 DS = 1.0  # resolucion en metros
+# canales internos del logger que no son sensores utiles para el piloto
+SKIP_CH = {"Best Run Diff", "Best Today Diff", "Prev Lap Diff", "Ref Lap Diff", "Predictive Time", "TimTpItow",
+           "TimePulseTick", "ZeroX5", "ZeroX50", "Calculated_Gear", "Distance Lap", "MagnetomX", "MagnetomY", "MagnetomZ"}
 
 
 def load_session(path):
@@ -31,7 +34,21 @@ def load_session(path):
             continue
         d = log.channels[name].to_pandas()
         chans[short] = (d.timecodes.values.astype(float), d[name].values.astype(float))
-    return dict(
+    # resto de los canales (sensores): se guardan para el analisis de sensores
+    extra = {}
+    for name, tbl in log.channels.items():
+        if name in CH or name.startswith("GPS") or name in SKIP_CH:
+            continue
+        try:
+            d = tbl.to_pandas()
+            unit = (tbl.schema.field(name).metadata or {}).get(b"units", b"").decode()
+            extra[name] = (d.timecodes.values.astype(float), d[name].values.astype(float), unit)
+        except Exception:
+            pass
+    lat, lon = chans["lat"][1], chans["lon"][1]
+    ok = np.isfinite(lat) & np.isfinite(lon) & (np.abs(lat) > 0.1)
+    return dict(lat0=float(np.median(lat[ok])) if ok.any() else None, lon0=float(np.median(lon[ok])) if ok.any() else None,
+        extra=extra,
         path=path,
         id=os.path.splitext(path)[0].split("_")[-1],
         driver=md.get("Driver"), vehicle=md.get("Vehicle"), venue=md.get("Venue"),
@@ -139,7 +156,7 @@ def lap_on_distance(ses, lap, ref):
     for k in ("speed", "rpm", "latg", "long", "yaw", "water"):
         tc, v = ses["chans"][k]
         good = np.isfinite(v)
-        df[k] = np.interp(t_of_s, tc[good], v[good])
+        df[k] = np.interp(t_of_s, tc[good], v[good]) if good.any() else np.nan  # canal ausente (p. ej. sin sensor de agua)
     df["speed"] *= 3.6
     df["x"] = np.interp(grid, ref.s, ref.x)
     df["y"] = np.interp(grid, ref.s, ref.y)

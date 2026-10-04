@@ -14,7 +14,7 @@ async function init(id) {
   await py.pyimport("micropip").install("libxrk==0.13.0");
   py.FS.mkdirTree("/home/pyodide/kt");
   py.FS.mkdirTree("/data");
-  for (const m of ["kartlib", "motor", "tandas", "sesiones"]) {
+  for (const m of ["kartlib", "motor", "tandas", "sesiones", "setup_kart"]) {
     const r = await fetch(`app/${m}.py`, { cache: "no-cache" });
     if (!r.ok) throw new Error(`No se pudo cargar ${m}.py`);
     py.FS.writeFile(`/home/pyodide/kt/${m}.py`, await r.text());

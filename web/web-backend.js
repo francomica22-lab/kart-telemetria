@@ -56,7 +56,8 @@
     },
     async export_html() {
       if (!last) return { error: "Primero compará tandas." };
-      const [css, js] = await Promise.all([fetch("styles.css").then(r => r.text()), fetch("report.js").then(r => r.text())]);
+      const [css, js1, js2] = await Promise.all([fetch("styles.css").then(r => r.text()), fetch("report-extra.js").then(r => r.text()), fetch("report.js").then(r => r.text())]);
+      const js = js1 + "\n" + js2;
       const ids = last.sessions.map(s => s.top[0].toFixed(3));
       const data = JSON.stringify(last).replace(/<\//g, "<\\/");
       const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${ids.join(" vs ")}</title><style>${css}\nhtml,body{height:auto} body{overflow:auto}</style></head><body><div id="app"></div><script>${js.replace(/<\/script/gi, "<\\/script")}<\/script><script>renderReport(${data}, document.getElementById("app"), {});<\/script></body></html>`;

@@ -48,7 +48,7 @@ def _session_series(s, laps, gears, ref_len):
         t = tr[m]
         rpm = pd.Series(r[m]).rolling(3, center=True, min_periods=1).median().values
         kmh = np.interp(t, ts, vs) * 3.6
-        d = pd.DataFrame(dict(t=t, lap=int(lap.num), rpm=rpm, kmh=kmh, acc=np.interp(t, ts, acc),
+        d = pd.DataFrame(dict(t=t, lap=int(lap.num), rpm=rpm, rpm_raw=r[m], kmh=kmh, acc=np.interp(t, ts, acc),
                               lat=np.abs(np.interp(t, tla, la))))
         ratio = d.rpm / d.kmh.clip(lower=1)
         d["gear"] = 0
@@ -99,6 +99,8 @@ def _band_events(d, lo, hi, corners):
 def _dyno(d, gear, lo=9000, hi=14600, step=250):
     """Aceleracion media por banda de RPM, solo acelerando en (casi) linea recta."""
     q = d[(d.gear == gear)].copy()
+    if len(q) < 3:  # casi sin datos en esta marcha
+        return []
     q["drpm"] = np.gradient(q.rpm.values)
     q = q[(q.drpm > 0) & (q.lat < 0.8)]
     out = []
@@ -113,6 +115,8 @@ def _lap_index(d, gear, ref_curve, step=250):
     """Un numero por vuelta: aceleracion de esa vuelta relativa a la curva de referencia (1.00 = igual).
     Medir por vuelta evita contar como independientes muestras pegadas de la misma vuelta."""
     q = d[(d.gear == gear)].copy()
+    if len(q) < 3:
+        return np.array([])
     q["drpm"] = np.gradient(q.rpm.values)
     q = q[(q.drpm > 0) & (q.lat < 0.8)]
     q["bin"] = (q.rpm // step) * step + step / 2
@@ -126,6 +130,78 @@ def _lap_index(d, gear, ref_curve, step=250):
             # asi un regimen alto (poca aceleracion por el aire) no infla el porcentaje
             out.append(float(1 + sum(m[b] - ref_curve[b] for b in m.index) / sum(ref_curve[b] for b in m.index)))
     return np.array(out)
+
+
+def _power_bins(d, step=250, lo=8500, hi=14800):
+    """Datos para la curva de potencia: por regimen, aceleracion y velocidad medianas acelerando casi en recta.
+    La potencia se calcula en la interfaz: P = (m*a + 1/2*rho*CdA*v^2 + Crr*m*g) * v, con peso y aire editables.
+    Usa las dos marchas juntas: a igual RPM el motor entrega la misma potencia en 1ra que en 2da."""
+    q = d[d.gear > 0].copy()
+    if len(q) < 3:
+        return []
+    q["drpm"] = np.gradient(q.rpm.values)
+    q = q[(q.drpm > 0) & (q.lat < 0.8) & (q.acc > -0.05)]
+    out = []
+    for b in range(lo, hi, step):
+        x = q[(q.rpm >= b) & (q.rpm < b + step)]
+        if len(x) < 10:
+            continue
+        laps = x.groupby("lap").size()
+        out.append(dict(rpm=b + step / 2, acc=round(float(x.acc.median()), 4), v=round(float((x.kmh / 3.6).median()), 3),
+                        n=int(len(x)), vueltas=int((laps >= 2).sum()),
+                        g1=int((x.gear == 1).sum()), g2=int((x.gear == 2).sum())))
+    return out
+
+
+def _transmision(d, corners, gears):
+    """RPM y velocidad al final de cada recta (antes de frenar) y minimas en curva, mediana de las vueltas."""
+    fin, curva = [], []
+    for c in corners:
+        x = d[(d.s >= c["s_start"] - 15) & (d.s <= c["s_start"] + 15)]
+        if len(x):
+            per = x.groupby("lap").agg(rpm=("rpm", "max"), kmh=("kmh", "max"))
+            fin.append(dict(curva=c["n"], rpm=round(float(per.rpm.median())), kmh=round(float(per.kmh.median()), 1)))
+        y = d[(d.s >= c["s_apex"] - 25) & (d.s <= c["s_apex"] + 25)]
+        if len(y):
+            per = y.groupby("lap").agg(rpm=("rpm", "min"), kmh=("kmh", "min"))
+            gear = int(y.gear[y.gear > 0].mode().iloc[0]) if (y.gear > 0).any() else 0
+            curva.append(dict(curva=c["n"], rpm=round(float(per.rpm.median())), kmh=round(float(per.kmh.median()), 1), marcha=gear))
+    top = d.rpm.quantile(0.995)
+    return dict(fin_recta=fin, curvas=curva, rpm_tope=round(float(top)),
+                pct_sobre_13800=round(float((d.rpm > 13800).mean() * 100), 1),
+                relaciones={str(g): v for g, v in gears.items()})
+
+
+def _fallas(d, corners):
+    """Cortes del motor: las RPM caen de golpe (>2.000 rpm o >25% en una muestra) y vuelven enseguida, sin que cambie la velocidad.
+    Un cambio de marcha o un bloqueo de rueda cambian la velocidad; un corte de encendido no."""
+    ev = []
+    for lap, q in d.groupby("lap"):
+        r, v, t = q.rpm_raw.values, q.kmh.values, q.t.values
+        s = q.s.values if "s" in q else np.full(len(q), np.nan)
+        for i in range(3, len(r) - 3):
+            vec = np.r_[r[i - 3:i], r[i + 1:i + 4]]
+            base = np.median(vec)
+            if base < 6000 or v[i] < 30:
+                continue
+            drop = base - r[i]
+            # la velocidad en +-0.15 s casi no cambia y las RPM vuelven al nivel de antes
+            recovers = max(r[i + 1], r[i + 2]) > r[i] + 0.6 * drop   # un corte vuelve enseguida
+            if (drop > 2000 or drop > 0.25 * base) and recovers and abs(v[i + 3] - v[i - 3]) < 3 and abs(r[i + 3] - r[i - 3]) < 1500:
+                c = next((c for c in corners if c["s_start"] <= s[i] <= c["s_end"]), None) if np.isfinite(s[i]) else None
+                ev.append(dict(vuelta=int(lap), s=round(float(s[i]), 0) if np.isfinite(s[i]) else None, curva=c["n"] if c else None,
+                               rpm_antes=int(base), rpm_min=int(r[i]), kmh=round(float(v[i]), 0)))
+    # agrupar: misma curva en varias vueltas = falla repetida
+    nlaps = int(d.lap.nunique())
+    resumen = {}
+    for e in ev:
+        k = e["curva"] or 0
+        g = resumen.setdefault(k, dict(curva=e["curva"], vueltas=set(), caida=[], kmh=[]))
+        g["vueltas"].add(e["vuelta"]); g["caida"].append(e["rpm_antes"] - e["rpm_min"]); g["kmh"].append(e["kmh"])
+    grupos = [dict(curva=g["curva"], vueltas=sorted(g["vueltas"]), n=len(g["vueltas"]), caida=int(np.median(g["caida"])),
+                   kmh=int(np.median(g["kmh"]))) for g in resumen.values()]
+    grupos.sort(key=lambda g: -g["n"])
+    return dict(eventos=ev[:200], grupos=grupos, vueltas=nlaps)
 
 
 def _shifts(d):
@@ -155,6 +231,8 @@ def analyze(S, laps_by_ses, ref_id, ref_len, corners, bands=None):
         sh = _shifts(d)
         res["sessions"][sid] = dict(
             dyno={g: _dyno(d, g) for g in gears},
+            potencia=_power_bins(d), transmision=_transmision(d, corners, gears), n_vueltas=int(d.lap.nunique()),
+            fallas=_fallas(d, corners),
             bands={k: (dict(n=len(e), median=float(e.dur.median()), p25=float(e.dur.quantile(.25)), p75=float(e.dur.quantile(.75)),
                             by_gear={int(g): dict(n=len(x), median=float(x.dur.median())) for g, x in e.groupby("gear")})
                        if len(e) else dict(n=0)) for k, e in ev.items()},

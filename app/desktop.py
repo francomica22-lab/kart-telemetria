@@ -10,6 +10,7 @@ import webview
 import updater
 from sesiones import session_info, clean
 from tandas import build_data, render_html
+import setup_kart  # noqa: F401 (lo usa save_setup)
 
 BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WEB = os.path.join(BASE, "web")
@@ -116,6 +117,13 @@ class Api:
             return {"path": path}
         except Exception as e:
             return {"error": f"No se pudo exportar: {e}"}
+
+    def save_setup(self, path, values):
+        try:
+            import setup_kart
+            return {"ok": True, "valores": setup_kart.save(path, values)}
+        except Exception as e:
+            return {"error": f"No se pudo guardar el setup: {e}"}
 
     # ---------- actualizaciones ----------
     def check_update(self):

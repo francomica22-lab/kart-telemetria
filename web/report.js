@@ -15,8 +15,9 @@
     const C = D.corners, M = D.motor, others = IDS.filter(i => i != REF);
     const COL = Object.fromEntries(IDS.map((id, i) => [id, (opts.colors && opts.colors[id]) || PAL[i % 5]]));
     const BT = id => S[id].top[0].toFixed(3);   // identidad de la tanda: su mejor tiempo
-    const NAME = id => `${BT(id)} · ${S[id].hour}`;
-    const TAG = id => `<b style="color:${COL[id]}">${BT(id)}</b> <span class="muted">(${S[id].hour})</span>`;
+    const multiDriver = new Set(D.sessions.map(s => (s.driver || "").trim().toUpperCase())).size > 1;
+    const NAME = id => `${BT(id)} · ${multiDriver ? (S[id].driver || "?") + " · " : ""}${S[id].hour}`;
+    const TAG = id => `<b style="color:${COL[id]}">${BT(id)}</b> <span class="muted">(${multiDriver ? esc(S[id].driver || "?") + ", " : ""}${S[id].hour})</span>`;
     const legend = (ids, extra = "") => ids.map(id => `<span style="--c:${COL[id]}">${esc(NAME(id))}</span>`).join("") + extra;
     const fecha = d => d && d.length == 10 ? `${d.slice(3, 5)}/${d.slice(0, 2)}/${d.slice(6)}` : d;
 
@@ -24,10 +25,11 @@
     <div class="rep">
       <div class="rep-head">
         <div style="display:grid;gap:4px">
-          <div class="eyebrow">${esc([...new Set(D.sessions.map(s => fecha(s.date)))].join(" · "))} · ${esc([...new Set(D.sessions.map(s => s.kart))].join(" / "))} · piloto ${esc(D.sessions[0].driver || "")} · pista ${Math.round(D.track.L)} m</div>
-          <h1>${IDS.map(BT).join(" vs ")}</h1>
+          <div class="eyebrow">${esc([...new Set(D.sessions.map(s => fecha(s.date)))].join(" · "))} · ${esc([...new Set(D.sessions.map(s => s.kart))].join(" / "))} · ${multiDriver ? "pilotos " + esc([...new Set(D.sessions.map(s => s.driver))].join(" / ")) : "piloto " + esc(D.sessions[0].driver || "")} · pista ${Math.round(D.track.L)} m</div>
+          <h1>${IDS.length > 1 ? IDS.map(BT).join(" vs ") : "Tanda " + BT(IDS[0])}</h1>
         </div>
-        <div class="muted" style="font-size:12.5px">Referencia: ${BT(REF)} · ${S[REF].hour} (vuelta ${D.ref_lap}, tanda ${REF})</div>
+        <div class="rep-actions"><div class="muted" style="font-size:12.5px">${IDS.length > 1 ? `Referencia: ${BT(REF)} · ${S[REF].hour} (vuelta ${D.ref_lap}, tanda ${REF})` : `Mejor vuelta: ${D.ref_lap} · tanda ${REF}`}</div>
+          ${opts.onExport ? `<button class="btn expbtn">Exportar reporte HTML</button>` : ""}</div>
       </div>
       <div class="cards-ses">${IDS.map(id => {
         const s = S[id], w = s.laps.filter(l => s.top.includes(l.t) && l.agua != null).map(l => l.agua);
@@ -35,7 +37,10 @@
           <div class="t">${s.top[0].toFixed(3)}</div>
           <div class="l">top ${s.top.length}: ${s.top.map(x => x.toFixed(3)).join(" · ")} · prom ${avg(s.top).toFixed(3)}</div>
           <div class="l">ideal ${s.ideal.toFixed(3)} · punta ${s.vmax} km/h${w.length ? ` · agua ${Math.min(...w).toFixed(0)}–${Math.max(...w).toFixed(0)} °C` : ""}</div>
-          <div class="cm">${s.comment ? "“" + esc(s.comment.replace(/\n/g, ", ")) + "”" : "<span class='muted'>sin comentario en la tanda</span>"}</div></div>`;
+          ${(D.clima || {})[id] ? `<div class="l clima" title="Clima en la pista a la hora de la tanda (Open-Meteo)">${KTX.climaTxt(D.clima[id])}</div>` : ""}
+          <div class="cm">${s.comment ? "“" + esc(s.comment.replace(/\n/g, ", ")) + "”" : "<span class='muted'>sin comentario en la tanda</span>"}</div>
+          <div class="schips">${KTX.setupChips(D, s)}</div>
+          ${opts.saveSetup ? `<button class="link setbtn" data-id="${id}">Editar setup</button>` : ""}</div>`;
       }).join("")}</div>
       <div class="modesw" role="group" aria-label="Tipo de análisis">
         <button data-m="simple">Análisis simple</button><button data-m="detalle">Análisis detallado</button>
@@ -43,12 +48,16 @@
       <div class="simple"></div>
       <div class="detalle">
       <div class="tabs" role="tablist">
-        ${["Resumen", "Curvas", "Motor", "Vueltas"].map((t, i) => `<button class="tab${i == 0 ? " on" : ""}" role="tab" data-t="${i}">${t}</button>`).join("")}
+        ${[["Resumen", 0], ["Curvas", 1], ["Vuelta óptima", 4], ["Motor", 2], ["Transmisión", 5], ["Sensores", 6], ["Video", 7], ["Vueltas", 3]].map(([t, i], j) => `<button class="tab${j == 0 ? " on" : ""}" role="tab" data-t="${i}">${t}</button>`).join("")}
       </div>
       <div class="pane" data-p="0"></div>
       <div class="pane" data-p="1" hidden></div>
       <div class="pane" data-p="2" hidden></div>
       <div class="pane" data-p="3" hidden></div>
+      <div class="pane" data-p="4" hidden></div>
+      <div class="pane" data-p="5" hidden></div>
+      <div class="pane" data-p="6" hidden></div>
+      <div class="pane" data-p="7" hidden></div>
       </div>
     </div>`;
     // modo simple / detallado (se recuerda en este equipo)
@@ -65,7 +74,18 @@
       tabs.forEach(x => x.classList.toggle("on", x == b));
       panes.forEach(p => p.hidden = p.dataset.p != b.dataset.t);
     }));
-    const P = i => panes[i];
+    const P = i => root.querySelector(`.pane[data-p="${i}"]`);
+    const eb = root.querySelector(".expbtn"); if (eb) eb.addEventListener("click", () => opts.onExport());
+    const ctx = { D, IDS, S, COL, NAME, M, REF, BT };
+    root.querySelectorAll(".setbtn").forEach(b => b.addEventListener("click", () => {
+      const s = S[b.dataset.id];
+      KTX.setupModal(D, s, async vals => {
+        const r = await opts.saveSetup(s, vals);
+        if (r && r.error) return r;
+        s.setup = s.setup || {}; s.setup.valores = Object.assign({}, s.setup.auto || {}, r && r.valores ? r.valores : vals); s.setup.manual = vals;
+        renderReport(D, root, opts);
+      });
+    }));
 
     /* ---------- conclusiones en palabras ---------- */
     const f1 = v => Math.abs(v).toFixed(1), f0 = v => Math.abs(v).toFixed(0);
@@ -112,7 +132,10 @@
           r.push(dPrev <= -0.8 ? `llega más lento porque sale ${f1(dPrev)} km/h más lento de la curva ${p.n - 1}` : "la diferencia se reparte a lo largo de la curva, sin un punto claro");
         } return `<li><b>Curva ${p.n}</b> <span class="b num">+${p.d.toFixed(2)} s</span> <span class="chip ${p.k}">${p.k}</span>${r.length ? " " + r.slice(0, 3).join(", ") + "." : ""}</li>`; });
       const adv = lost.filter(p => p.k == "manejo").slice(0, 3).map(p => { const t = advice(p.a, p.b); return t.length ? `<li><b>Curva ${p.n}:</b> ${t.join("; ")}.</li>` : ""; }).join("");
+      const sd = KTX.setupDiff(D, S[REF], S[id]);
+      const cl = (D.clima || {}), climaNote = cl[id] && cl[REF] && Math.abs(cl[id].T - cl[REF].T) >= 3 ? ` La pista estaba más ${cl[id].T > cl[REF].T ? "caliente" : "fría"}: ${cl[REF].T.toFixed(0)} °C → ${cl[id].T.toFixed(0)} °C de aire.` : "";
       return `<p class="lead">La ${TAG(id)} es ${g} por vuelta que la ${TAG(REF)}. ${verdict}</p>
+        ${sd.length ? `<p class="small ink2"><b>Cambios de setup</b> de la ${BT(REF)} a la ${BT(id)}: ${sd.map(esc).join("; ")}.${climaNote}</p>` : climaNote ? `<p class="small ink2">${climaNote.trim()}</p>` : ""}
         ${items.length ? `<ul class="why">${items.join("")}</ul>` : ""}
         ${won.length ? `<p class="ink2 small">Gana en ${won.map(p => `curva ${p.n} (${sgn(p.d)} s)`).join(", ")}.</p>` : ""}
         ${adv ? `<div class="todo"><div class="eyebrow">Para trabajar</div><ul>${adv}</ul></div>` : ""}`;
@@ -128,14 +151,23 @@
       const wA = wa(REF), wB = wa(id);
       if (wA != null && wB != null && Math.abs(wB - wA) >= 4) notes.push(`El agua estuvo ${f0(wB - wA)} °C más ${wB > wA ? "caliente" : "fría"} en la ${BT(id)}.`);
       const hh = x => { const [h, m] = S[x].hour.split(":").map(Number); return h + m / 60; };
-      if (Math.abs(hh(id) - hh(REF)) >= 2) notes.push(`Hay ${f1(hh(id) - hh(REF))} h entre una tanda y otra: la temperatura del aire también cambia la potencia.`);
+      if (Math.abs(hh(id) - hh(REF)) >= 2 && !((D.clima || {})[id] && (D.clima || {})[REF])) notes.push(`Hay ${f1(hh(id) - hh(REF))} h entre una tanda y otra: la temperatura del aire también cambia la potencia.`);
       const dv = S[id].vmax - S[REF].vmax;
       if (!d) return `<p class="lead">No hay datos suficientes de aceleración en ${gn} para comparar el rendimiento del motor.</p>`;
       const range = `entre ${(d.rango[0] / 1000).toFixed(1)}k y ${(d.rango[1] / 1000).toFixed(1)}k rpm`;
       let lead; const why = [];
+      const cl = D.clima || {};
+      if (cl[id] && cl[REF]) {
+        const air = (cl[id].rho / cl[REF].rho - 1) * 100;
+        if (Math.abs(air) >= 0.5) {
+          const corr = d.pct - air;
+          notes.unshift(`El aire estuvo ${f1(air)}% más ${air > 0 ? "denso" : "liviano"} en la ${BT(id)} (${cl[REF].T.toFixed(0)} → ${cl[id].T.toFixed(0)} °C, ${cl[REF].RH.toFixed(0)} → ${cl[id].RH.toFixed(0)}% hum). Descontando el clima, la diferencia queda en ${sgn(corr, 1)}%${Math.abs(corr) <= (d.margin ?? 2 * d.se) ? ", dentro del margen" : ""}.`);
+        } else notes.unshift(`El aire estuvo prácticamente igual en las dos tandas (densidad ${sgn(air, 1)}%): el clima no explica la diferencia.`);
+      }
+      const hp = KTX.hpDelta(ctx, id, d.pct);
       if (d.real) {
         const win = d.pct > 0 ? id : REF, lose = win == id ? REF : id;
-        lead = `<b>La unidad de potencia rindió más en la ${TAG(win)}:</b> a igual RPM acelera <b>${f1(d.pct)}% más</b> en ${gn} ${range} (margen ±${(d.margin ?? 2 * d.se).toFixed(1)}%${d.vueltas ? `, medido en ${d.vueltas[0]} y ${d.vueltas[1]} vueltas` : ""}).`;
+        lead = `<b>La unidad de potencia rindió más en la ${TAG(win)}:</b>${hp != null ? ` unos <b>${f1(hp)} HP</b> más,` : ""} a igual RPM acelera <b>${f1(d.pct)}% más</b> en ${gn} ${range} (margen ±${(d.margin ?? 2 * d.se).toFixed(1)}%${d.vueltas ? `, medido en ${d.vueltas[0]} y ${d.vueltas[1]} vueltas` : ""}).`;
         notes.unshift("Si el motor fue el mismo, una diferencia así suele venir de la carburación, la temperatura o humedad del aire, el viento en las rectas, la presión de las gomas o el peso. No significa necesariamente que un motor sea mejor que otro.");
         if (Math.abs(dv) >= 0.5) why.push(`${(dv > 0) == (win == id) ? "Lo confirma la punta" : "Sin embargo, la punta va al revés"}: ${S[win].vmax} contra ${S[lose].vmax} km/h.`);
       } else {
@@ -146,6 +178,14 @@
       if (!Object.values(c.bands).some(b => b && b.real)) why.push("Las subidas de RPM por salida de curva no muestran diferencias claras.");
       return `<p class="lead">${lead}</p><ul class="why">${why.concat(notes).map(x => `<li>${x}</li>`).join("")}</ul>`;
     }
+    // alertas de motor: cortes de RPM repetidos en la misma curva
+    const alertsHTML = (() => {
+      const items = IDS.flatMap(id => (((M.sessions[id] || {}).fallas || {}).grupos || []).filter(g => g.n >= 2 && g.curva).map(g => ({ id, g, f: M.sessions[id].fallas })));
+      if (!items.length) return "";
+      return `<div class="panel alert"><div class="alert-h"><span class="bang">!</span><h2>Posible falla de motor</h2></div>
+        <ul class="why">${items.map(({ id, g, f }) => `<li>En la ${TAG(id)}, en la <b>curva ${g.curva}</b>: en ${g.n} de ${f.vueltas} vueltas (vuelta ${g.vueltas.join(", ")}) las RPM se cortan de golpe unas ${g.caida} rpm a ${g.kmh} km/h y vuelven, <b>sin que cambie la velocidad</b>. No es un cambio de marcha: es el motor que falla un instante.</li>`).join("")}</ul>
+        <p class="small ink2">Suele venir del encendido (bujía, pipa o cable), de la carburación en baja o de un falso contacto en el cable de RPM. Si pasa siempre en el mismo lugar, mirá qué tiene de particular esa curva (vibración, pianito, régimen bajo).</p></div>`;
+    })();
     const conclusionsHTML = which => others.map(id => `<div class="concl">${others.length > 1 ? `<div class="eyebrow">${NAME(id)} contra ${NAME(REF)}</div>` : ""}${which == "m" ? motorConclusion(id) : driveConclusion(id)}</div>`).join("");
 
     /* ================= RESUMEN ================= */
@@ -157,11 +197,11 @@
       const real = d2.real;
       return `${real ? `<b class="${d2.pct > 0 ? "g" : "b"}">${sgn(d2.pct, 1)}% de aceleración en 2da</b>` : `<b>Sin diferencia medible</b> (${sgn(d2.pct, 1)}% ± ${(2 * d2.se).toFixed(1)}%)`} contra la ${REF}, a igual RPM.`;
     };
-    let resumen = `<div class="panel conclusion"><h2>Conclusión</h2>
+    let resumen = !others.length ? `<div class="panel conclusion"><h2>Conclusión</h2>${KTX.optimoPane(ctx).replace('<div class="panel">', '<div>')}</div>` : `<div class="panel conclusion"><h2>Conclusión</h2>
       <div class="cgrid"><section><div class="eyebrow">Manejo y agarre</div>${conclusionsHTML("d")}</section>
       <section><div class="eyebrow">Motor</div>${conclusionsHTML("m")}</section></div></div>`;
     for (const id of others) resumen += `<div class="panel"><div class="eyebrow" style="margin-bottom:8px">Dónde pierde la ${NAME(id)}, curva por curva (naranja: manejo · verde: agarre · gris: zona gris)</div><div class="split" data-id="${id}"></div></div>`;
-    P(0).innerHTML = `
+    P(0).innerHTML = alertsHTML + `
       <div class="verdict" style="display:grid;gap:12px">${resumen || ""}</div>
       ${opts.notas ? `<div class="panel">${opts.notas}</div>` : ""}
       <div class="grid2">
@@ -245,7 +285,10 @@
         const win = d.pct > 0 ? id : REF;
         return `El motor rindió un poco más en la ${BT(win)} (${f1(d.pct)}%). Si es el mismo motor, puede ser por el clima o la carburación.`;
       };
-      let h = "";
+      let h = !others.length ? `<section class="sp"><div class="sp-head"><div class="eyebrow">${NAME(REF)}</div>
+          <p class="sp-big">Tu mejor vuelta fue <b>${BT(REF)}</b>. Juntando tus mejores curvas podrías hacer <b>${D.optimo[REF].optima.toFixed(3)}</b>.</p>
+          <p class="ink2">Tu promedio fue ${D.optimo[REF].promedio.toFixed(3)} en ${D.optimo[REF].vueltas} vueltas. Para comparar contra otra tanda, elegí dos o más.</p></div>
+          ${KTX.simpleOptimo(ctx, REF)}</section>` : "";
       for (const id of others) {
         const gap = avg(S[id].top) - avg(S[REF].top);
         const parts = C.map(c => ({ id, n: c.n, k: c.diag[id][0], d: c.diag[id][1], a: c.by[REF], b: c.by[id] }));
@@ -266,6 +309,7 @@
                 ${won.length ? `<p class="ink2 small" style="margin-top:10px">Bien hecho en ${won.map(p => "la curva " + p.n).join(" y ")}: ahí la ${BT(id)} fue más rápida.</p>` : ""}
               </div>
               <div class="panel"><div class="eyebrow" style="margin-bottom:6px">Motor</div><p>${motorSimple(id)}</p></div>
+              ${KTX.simpleOptimo(ctx, id)}
             </div>
           </div>
         </section>`;
@@ -278,7 +322,7 @@
         }).join("") + `</div>`;
       }).join("")}</div><p class="ink2 small" style="margin-top:8px">La barra más larga es la vuelta más rápida de cada tanda.</p></div>
       <p class="ink2 small">¿Querés ver el porqué de cada número? Pasá al <button class="link" data-go="detalle">análisis detallado</button>.</p>`;
-      box.innerHTML = h;
+      box.innerHTML = alertsHTML + h;
       box.querySelector("[data-go]").addEventListener("click", () => { setMode("detalle"); root.scrollIntoView(); });
       box.querySelectorAll(".sp-map svg").forEach(svg => {
         const id = svg.dataset.id, tp2 = tx.map((x, i) => MX(x).toFixed(1) + "," + MY(ty[i]).toFixed(1));
@@ -307,7 +351,7 @@
 
     /* ================= CURVAS ================= */
     P(1).innerHTML = `
-      <div class="panel conclusion"><h2>Conclusión · manejo y agarre</h2>${conclusionsHTML("d")}</div>
+      ${others.length ? `<div class="panel conclusion"><h2>Conclusión · manejo y agarre</h2>${conclusionsHTML("d")}</div>` : ""}
       <div class="panel sectors"><div class="sec-head"><h2>Sectores</h2>
         <div class="seg" role="group" aria-label="Cantidad de sectores">${Object.keys(D.sectors || {}).map((n, i) => `<button data-n="${n}" class="${i == 0 ? "on" : ""}">${n} sectores</button>`).join("")}</div></div>
         <p class="ink2">La pista se divide en sectores de largo parecido, con los cortes en las rectas. Promedio de las mejores vueltas y mejor sector de cada tanda.</p>
@@ -413,7 +457,7 @@
         const d = c.dyno[g] || c.dyno[String(g)];
         if (!d) { h += card(`Aceleración en ${GEARN(g)}`, "–", "No hay suficientes datos en las dos tandas."); continue; }
         const cls = d.real ? (d.pct > 0 ? "g" : "b") : "";
-        h += card(`Aceleración en ${GEARN(g)}${g == top ? " · medida principal" : ""}`, `${sgn(d.pct, 1)}%`,
+        h += card(`Rendimiento a igual RPM en ${GEARN(g)}${g == top ? " · medida principal" : ""}`, `${sgn(d.pct, 1)}%`,
           `${d.real ? `<span class="chip ${d.pct > 0 ? "good" : "bad"}">${d.pct > 0 ? "mejor" : "peor"}</span>` : `<span class="chip">dentro del ruido</span>`} margen ±${(d.margin ?? 2 * d.se).toFixed(1)}% · ${Math.round(d.rango[0] / 100) / 10}k–${Math.round(d.rango[1] / 100) / 10}k rpm`, cls);
       }
       for (const k of bandKeys) {
@@ -429,15 +473,10 @@
       const r = IDS.map(id => M.sessions[id].ratio_top), mn = Math.min(...r), mx = Math.max(...r);
       return (mx - mn) / mn > 0.015 ? `<p class="b" style="font-size:13px">La relación RPM/velocidad en ${GEARN(top)} cambia ${(((mx - mn) / mn) * 100).toFixed(1)}% entre tandas: hubo cambio de corona o piñón (o de diámetro de rueda). Comparar aceleración entre relaciones distintas no es directo.</p>` : "";
     })();
-    P(2).innerHTML = `
-      <div class="panel conclusion"><h2>Conclusión · motor</h2>${conclusionsHTML("m")}</div>
+    P(2).innerHTML = alertsHTML + `
+      ${others.length ? `<div class="panel conclusion"><h2>Conclusión · motor</h2>${conclusionsHTML("m")}</div>` : ""}
       ${cmpCards}
-      <div class="panel"><h2>Dinamómetro de pista</h2>
-        <p class="ink2">Aceleración media en cada régimen, solo acelerando y casi en recta. En la misma marcha, a igual RPM la velocidad es la misma, y el arrastre del aire también: la diferencia entre curvas es el motor (o peso, viento, densidad del aire). La banda sombreada es el margen de cada punto.</p>
-        <div class="legend" style="margin-bottom:6px">${legend(IDS)}<span style="--c:var(--muted)">${gears.map(g => GEARN(g)).join(" · ")}: ${gears.length > 1 ? "línea llena 2da, punteada 1ra" : ""}</span></div>
-        <svg class="dyno" viewBox="0 0 1200 400"></svg>
-        <div class="readout dy-ro">Pasá el mouse por el gráfico</div>
-      </div>
+      ${KTX.powerPanel(ctx)}
       <div class="grid2b">
         <div class="panel"><h2>Subidas de RPM por salida de curva</h2>
           <p class="ink2">Mediana del tiempo para subir cada banda, separado por marcha y por curva de salida para comparar igual con igual. Menos es mejor.</p>
@@ -446,36 +485,7 @@
           <div class="tw"><table class="mtbl"></table></div>${ratioWarn}</div>
       </div>
       <p class="note">Cómo probar un cambio de motor, escape o carburación: dos tandas seguidas, mismo horario, mismas gomas y misma relación. Mirá primero el dinamómetro en 2da: es la medida más estable. Una diferencia "dentro del ruido" significa que con estos datos no se puede afirmar que haya cambio.</p>`;
-    // dyno chart
-    (() => {
-      const svg = P(2).querySelector(".dyno"), PL = 70, PR = 20, PT = 14, PB = 34, W = 1200, H = 400;
-      const pts = IDS.flatMap(id => gears.flatMap(g => (M.sessions[id].dyno[g] || M.sessions[id].dyno[String(g)] || [])));
-      if (!pts.length) { txt(svg, 600, 200, "Sin datos de aceleración", { "text-anchor": "middle" }); return; }
-      const x0 = Math.floor(Math.min(...pts.map(p => p.rpm)) / 1000) * 1000, x1 = Math.ceil(Math.max(...pts.map(p => p.rpm)) / 1000) * 1000;
-      const y0 = 0, y1 = Math.ceil(Math.max(...pts.map(p => p.acc + p.se)) * 10) / 10;
-      const X = v => PL + (v - x0) / (x1 - x0) * (W - PL - PR), Y = v => PT + (1 - (v - y0) / (y1 - y0)) * (H - PT - PB);
-      for (const v of tks(y0, y1, 4)) { el("line", { x1: PL, x2: W - PR, y1: Y(v), y2: Y(v), stroke: "var(--grid)" }, svg); txt(svg, PL - 6, Y(v) + 4, v.toFixed(2) + " g", { "text-anchor": "end" }); }
-      for (let v = x0; v <= x1; v += 1000) txt(svg, X(v), H - 10, (v / 1000) + "k", { "text-anchor": "middle" });
-      txt(svg, PL - 26, H - 10, "rpm", { "text-anchor": "end" });
-      for (const g of gears) for (const id of IDS) {
-        const d = M.sessions[id].dyno[g] || M.sessions[id].dyno[String(g)] || []; if (d.length < 2) continue;
-        const up = d.map(p => X(p.rpm).toFixed(1) + "," + Y(p.acc + p.se).toFixed(1)), dn = d.slice().reverse().map(p => X(p.rpm).toFixed(1) + "," + Y(Math.max(0, p.acc - p.se)).toFixed(1));
-        el("polygon", { points: up.concat(dn).join(" "), fill: COL[id], opacity: .14 }, svg);
-        el("polyline", { points: d.map(p => X(p.rpm).toFixed(1) + "," + Y(p.acc).toFixed(1)).join(" "), fill: "none", stroke: COL[id], "stroke-width": 2, "stroke-dasharray": g == top ? "" : "5 4", "stroke-linejoin": "round" }, svg);
-        if (id == IDS[0]) { const e = d[d.length - 1]; txt(svg, X(e.rpm) + 8, Y(e.acc) + 4, GEARN(g), { style: "fill:var(--ink2)" }); }
-      }
-      const cross = el("line", { y1: PT, y2: H - PB, stroke: "var(--ink2)", opacity: 0 }, svg), hit = el("rect", { x: PL, y: 0, width: W - PL - PR, height: H, fill: "transparent" }, svg);
-      const ro = P(2).querySelector(".dy-ro");
-      hit.addEventListener("pointermove", e => {
-        const r = svg.getBoundingClientRect(), vx = (e.clientX - r.left) / r.width * W, rpm = x0 + (vx - PL) / (W - PL - PR) * (x1 - x0);
-        cross.setAttribute("x1", vx); cross.setAttribute("x2", vx); cross.setAttribute("opacity", 1);
-        ro.innerHTML = `${Math.round(rpm)} rpm · ` + gears.map(g => GEARN(g) + ": " + IDS.map(id => {
-          const d = M.sessions[id].dyno[g] || M.sessions[id].dyno[String(g)] || [], p = d.reduce((a, q) => (!a || Math.abs(q.rpm - rpm) < Math.abs(a.rpm - rpm) ? q : a), null);
-          return p && Math.abs(p.rpm - rpm) < 200 ? `<span style="color:${COL[id]}">●</span> ${p.acc.toFixed(3)} g` : `<span style="color:${COL[id]}">●</span> –`;
-        }).join(" ")).join(" · ");
-      });
-      hit.addEventListener("pointerleave", () => cross.setAttribute("opacity", 0));
-    })();
+    KTX.drawPower(ctx, P(2));
     // tabla bandas por salida
     (() => {
       const rows = {};
@@ -504,6 +514,12 @@
       P(2).querySelector(".mtbl").innerHTML = `<thead><tr><th></th>${IDS.map(id => `<th><span class="dot" style="--c:${COL[id]}"></span>${BT(id)}</th>`).join("")}</tr></thead><tbody>` +
         rowsDef.map(([n, fn]) => `<tr><td>${n}</td>${IDS.map(id => `<td>${fn(id)}</td>`).join("")}</tr>`).join("") + "</tbody>";
     })();
+
+    /* ================= VUELTA OPTIMA · TRANSMISION · SENSORES · VIDEO ================= */
+    P(4).innerHTML = KTX.optimoPane(ctx);
+    P(5).innerHTML = KTX.transPane(ctx); KTX.wireTrans(ctx, P(5));
+    P(6).innerHTML = KTX.sensorsPane(ctx); KTX.drawWater(ctx, P(6));
+    P(7).innerHTML = KTX.videoPane(ctx); KTX.wireVideo(ctx, P(7));
 
     /* ================= VUELTAS ================= */
     P(3).innerHTML = `
