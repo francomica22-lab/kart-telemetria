@@ -38,6 +38,7 @@
           <div class="l" title="Mejores ${s.top.length}: ${s.top.map(x => x.toFixed(3)).join(" · ")} · ideal (mejores curvas juntas) ${s.ideal.toFixed(3)}">prom ${avg(s.top).toFixed(3)} · ideal ${s.ideal.toFixed(3)}</div>
           <div class="l stats" title="${(D.clima || {})[id] ? esc(KTX.climaTxt(D.clima[id])) + " · " : ""}punta ${s.vmax} km/h">${(D.clima || {})[id] ? `${D.clima[id].T.toFixed(0)} °C · ` : ""}${s.vmax} km/h${w.length ? ` · agua ${Math.min(...w).toFixed(0)}–${Math.max(...w).toFixed(0)} °C` : ""}</div>
           ${s.comment ? `<div class="cm" title="${esc(s.comment)}">“${esc(s.comment.replace(/\n/g, ", "))}”</div>` : ""}
+          ${window.KTK ? `<button class="kartbtn" data-k="${esc(s.kart || "")}" title="Categoría, chasis y motor de este kart">${esc(KTK.label(s.kart))}${KTK.get(s.kart).confirmado ? "" : " <span class=\"muted\">· confirmar</span>"}</button>` : ""}
           <div class="schips">${KTX.setupChips(D, s)}</div>
           ${opts.saveSetup ? `<button class="link setbtn" data-id="${id}">Editar setup</button>` : ""}</div>`;
       }).join("")}</div>
@@ -77,6 +78,7 @@
     const P = i => root.querySelector(`.pane[data-p="${i}"]`);
     const eb = root.querySelector(".expbtn"); if (eb) eb.addEventListener("click", () => opts.onExport());
     const ctx = { D, IDS, S, COL, NAME, M, REF, BT };
+    root.querySelectorAll(".kartbtn").forEach(b => b.addEventListener("click", () => KTK.modal(b.dataset.k, () => { window.renderReport(D, root, opts); opts.onKartChange && opts.onKartChange(); })));
     root.querySelectorAll(".setbtn").forEach(b => b.addEventListener("click", () => {
       const s = S[b.dataset.id];
       KTX.setupModal(D, s, async vals => {

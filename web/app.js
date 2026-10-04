@@ -185,7 +185,8 @@
       await addWeather(last);
       const colors = {}; sel.forEach((p, i) => { const r = rowOf(p); if (r) colors[r.id] = PAL[i % PAL.length]; });
       $("empty").hidden = true; $("report").hidden = false;
-      renderReport(last, $("report"), { colors, saveSetup, onExport: exportReport });
+      renderReport(last, $("report"), { colors, saveSetup, onExport: exportReport, onKartChange: () => window.KTS && KTS.share(last, { version: VERSION, web: IS_WEB }) });
+      if (window.KTS) KTS.share(last, { version: VERSION, web: IS_WEB });   // resumen anonimo (si esta activado)
       $("main").scrollTop = 0;
     } catch (e) { toast("Error: " + (e.message || e), true); }
     finally { busy(false); }
@@ -268,6 +269,13 @@
       if (st.bands && st.bands.length) [[$("b1a"), $("b1b")], [$("b2a"), $("b2b")]].forEach((p, i) => { if (st.bands[i]) { p[0].value = st.bands[i][0]; p[1].value = st.bands[i][1]; } });
     } catch (e) { }
     topbar();
+    if (window.KTS) {
+      const sh = $("share-on"); sh.checked = KTS.enabled();
+      sh.addEventListener("change", () => { KTS.setEnabled(sh.checked); toast(sh.checked ? "Compartir datos anónimos: activado." : "Compartir datos anónimos: desactivado."); });
+      document.addEventListener("kt-share-change", () => { sh.checked = KTS.enabled(); });
+      $("share-info").addEventListener("click", () => KTS.notice(true));
+      KTS.notice(false); KTS.flush();
+    }
     if (IS_WEB) {
       $("empty").innerHTML = `<div class="eyebrow">Análisis de telemetría AiM MyChron</div>
         <h1>Compará tus tandas, curva por curva</h1>

@@ -19,6 +19,13 @@ Compará tandas de la **AiM MyChron** (archivos `.xrk`) curva por curva: cuánto
 - **Sensores**: agua, escape, batería y lo que haya registrado la MyChron.
 - **Video**: sincroniza el onboard con la telemetría escuchando el motor; dos videos se mueven juntos por posición en pista.
 - **Reportar un problema** desde la app.
+- **Catálogo de karts**: categoría, chasis y motor de cada kart (se confirma una vez por kart).
+
+## Datos anónimos
+
+La app comparte un resumen anónimo de cada tanda analizada (activado por defecto, se desactiva en *Ajustes del análisis*):
+circuito (ubicación aproximada, largo, curvas), kart (categoría, chasis, motor), setup, clima, mejor tiempo y resultados del análisis.
+**Nunca** se envían vueltas, telemetría, archivos, nombres ni comentarios libres. La base (Supabase) solo permite agregar resúmenes: no se pueden leer ni modificar desde la app.
 
 ## Estructura
 
