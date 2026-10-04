@@ -18,6 +18,7 @@ Compará tandas de la **AiM MyChron** (archivos `.xrk`) curva por curva: cuánto
 - **Transmisión**: sugiere la corona según las RPM al final de la recta.
 - **Sensores**: agua, escape, batería y lo que haya registrado la MyChron.
 - **Video**: sincroniza el onboard con la telemetría escuchando el motor; dos videos se mueven juntos por posición en pista.
+- **Compartir**: link y QR para abrir el reporte en el celular (vence a los 30 días), o PDF.
 - **Reportar un problema** desde la app.
 - **Catálogo de karts**: categoría, chasis y motor de cada kart (se confirma una vez por kart).
 

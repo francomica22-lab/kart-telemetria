@@ -435,7 +435,7 @@
         const link = root.querySelector(".vlink");
         if (!link || !link.checked || video.paused || p.s == null) return;
         for (const other of IDS) {
-          if (other == id || !state[other] || state[other].offset == null) continue;
+          if (other == id || !state[other] || state[other].offset == null || !S[other].serie) continue;
           const ov = root.querySelector(`.vbox[data-id="${other}"] video`), os = S[other].serie;
           const tO = ov.currentTime + state[other].offset + state[other].fine, po = atTime(os, tO);
           if (!os.s || !po.lap) continue;

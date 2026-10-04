@@ -29,7 +29,8 @@
           <h1>${IDS.length > 1 ? IDS.map(BT).join(" vs ") : "Tanda " + BT(IDS[0])}</h1>
         </div>
         <div class="rep-actions"><div class="muted" style="font-size:12.5px">${IDS.length > 1 ? `Referencia: ${BT(REF)} · ${S[REF].hour} (vuelta ${D.ref_lap}, tanda ${REF})` : `Mejor vuelta: ${D.ref_lap} · tanda ${REF}`}</div>
-          ${opts.onExport ? `<button class="btn expbtn">Exportar reporte HTML</button>` : ""}</div>
+          ${opts.onShare ? `<button class="btn primary shbtn" style="width:auto">Compartir</button>` : ""}
+          ${opts.onExport ? `<button class="btn expbtn">Exportar HTML</button>` : ""}</div>
       </div>
       <div class="cards-ses">${IDS.map(id => {
         const s = S[id], w = s.laps.filter(l => s.top.includes(l.t) && l.agua != null).map(l => l.agua);
@@ -77,6 +78,7 @@
     }));
     const P = i => root.querySelector(`.pane[data-p="${i}"]`);
     const eb = root.querySelector(".expbtn"); if (eb) eb.addEventListener("click", () => opts.onExport());
+    const sb = root.querySelector(".shbtn"); if (sb) sb.addEventListener("click", () => opts.onShare());
     const ctx = { D, IDS, S, COL, NAME, M, REF, BT };
     root.querySelectorAll(".kartbtn").forEach(b => b.addEventListener("click", () => KTK.modal(b.dataset.k, () => { window.renderReport(D, root, opts); opts.onKartChange && opts.onKartChange(); })));
     root.querySelectorAll(".setbtn").forEach(b => b.addEventListener("click", () => {
@@ -501,7 +503,7 @@
     // tabla bandas por salida
     (() => {
       const rows = {};
-      for (const id of IDS) for (const k of bandKeys) for (const e of (M.sessions[id].events[k] || [])) {
+      for (const id of IDS) for (const k of bandKeys) for (const e of ((M.sessions[id].events || {})[k] || [])) {
         const key = `${k}|${e.gear}|${e.salida}`; (rows[key] = rows[key] || { k, gear: e.gear, salida: e.salida, by: {} }); (rows[key].by[id] = rows[key].by[id] || []).push(e.dur);
       }
       const med = a => { const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };

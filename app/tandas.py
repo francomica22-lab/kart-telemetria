@@ -284,7 +284,7 @@ def render_html(out, out_dir=None, notas="", colors=None):
     html = f"""<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tandas {' vs '.join(ids)}</title><style>{css}
 html,body{{height:auto}} body{{overflow:auto}}</style></head><body><div id="app"></div>
-<script>{js}</script><script>renderReport({data}, document.getElementById("app"), {opts});</script></body></html>"""
+<script>{js}</script><script>renderReport({data}, document.getElementById("app"), {opts});</script><script>if(location.hash=="#pdf"){{document.body.classList.add("printing");document.querySelectorAll("details").forEach(x=>x.open=true);document.querySelectorAll("p.help").forEach(x=>x.hidden=false);setTimeout(()=>print(),700)}}</script></body></html>"""
     path = os.path.join(out_dir, f"tandas_{'_'.join(ids)}.html")
     open(path, "w", encoding="utf8").write(html)
     return path

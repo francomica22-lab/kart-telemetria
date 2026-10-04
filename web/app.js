@@ -167,6 +167,10 @@
     if (!r.error) toast("Setup guardado junto al archivo de la tanda.");
     return r;
   }
+  async function exportPdf() {
+    const r = IS_WEB ? await api().export_html({ pdf: true }) : await api().export_pdf();
+    if (r && r.error) toast(r.error, true); else toast("Se abrió el reporte para imprimir: elegí \"Guardar como PDF\".");
+  }
   async function exportReport() {
     const r = await api().export_html();
     if (r && r.path) toast(IS_WEB ? "Reporte descargado: " + r.path : "Reporte guardado en " + r.path); else if (r && r.error) toast(r.error, true);
@@ -185,7 +189,7 @@
       await addWeather(last);
       const colors = {}; sel.forEach((p, i) => { const r = rowOf(p); if (r) colors[r.id] = PAL[i % PAL.length]; });
       $("empty").hidden = true; $("report").hidden = false;
-      renderReport(last, $("report"), { colors, saveSetup, onExport: exportReport, onKartChange: () => window.KTS && KTS.share(last, { version: VERSION, web: IS_WEB }) });
+      renderReport(last, $("report"), { colors, saveSetup, onExport: exportReport, onShare: () => KTR.dialog(last, { onPdf: exportPdf }), onKartChange: () => window.KTS && KTS.share(last, { version: VERSION, web: IS_WEB }) });
       if (window.KTS) KTS.share(last, { version: VERSION, web: IS_WEB });   // resumen anonimo (si esta activado)
       $("main").scrollTop = 0;
     } catch (e) { toast("Error: " + (e.message || e), true); }

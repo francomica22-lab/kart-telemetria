@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reporte compartido · Análisis Karting</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  html,body{height:auto}
+  body{overflow:auto}
+  .vbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--side)}
+  .vbar b{font:700 16px var(--display);letter-spacing:.05em;text-transform:uppercase}
+  .vmsg{max-width:520px;margin:80px auto;padding:0 20px;display:grid;gap:12px;text-align:center}
+</style>
+</head>
+<body>
+<div class="vbar"><span><b>Análisis Karting</b> <span class="muted small">· reporte compartido</span></span>
+  <span style="display:flex;gap:8px"><button class="btn" id="v-pdf" hidden>PDF</button><a class="btn" href="./" style="text-decoration:none">Analizar mis tandas</a></span></div>
+<div id="app"><div class="vmsg"><div class="spin"></div><p class="ink2">Cargando el reporte…</p></div></div>
+<script src="catalogo.js"></script>
+<script src="report-extra.js"></script>
+<script src="report.js"></script>
+<script src="compartir-reporte.js"></script>
+<script>
+(async () => {
+  const app = document.getElementById("app"), id = location.hash.slice(1);
+  const fail = msg => app.innerHTML = `<div class="vmsg"><h1>Reporte no disponible</h1><p class="ink2">${msg}</p><p><a class="btn" href="./" style="text-decoration:none">Ir a Análisis Karting</a></p></div>`;
+  if (!/^[A-Za-z0-9_-]{6,20}$/.test(id)) return fail("El link está incompleto. Pedile a quien te lo mandó que lo copie de nuevo.");
+  try {
+    const D = await KTR.ver(id);
+    if (!D || !D.sessions) return fail("El reporte venció (duran 30 días) o el link no es correcto.");
+    renderReport(D, app, {});
+    document.title = `${D.sessions.map(s => s.top[0].toFixed(3)).join(" vs ")} · Análisis Karting`;
+    const b = document.getElementById("v-pdf"); b.hidden = false; b.addEventListener("click", () => KTR.printNow(app));
+  } catch (e) { fail("No se pudo cargar. Revisá la conexión e intentá de nuevo."); }
+})();
+</script>
+</body>
+</html>

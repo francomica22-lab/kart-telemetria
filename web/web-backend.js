@@ -54,13 +54,14 @@
         last = r.data; return { data: r.data };
       } catch (e) { return { error: `No se pudo comparar: ${e.message}. Revisá que sean tandas de la misma pista con vueltas completas.` }; }
     },
-    async export_html() {
+    async export_html(o = {}) {
       if (!last) return { error: "Primero compará tandas." };
       const [css, js1, js2] = await Promise.all([fetch("styles.css").then(r => r.text()), fetch("report-extra.js").then(r => r.text()), fetch("report.js").then(r => r.text())]);
       const js = js1 + "\n" + js2;
       const ids = last.sessions.map(s => s.top[0].toFixed(3));
       const data = JSON.stringify(last).replace(/<\//g, "<\\/");
-      const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${ids.join(" vs ")}</title><style>${css}\nhtml,body{height:auto} body{overflow:auto}</style></head><body><div id="app"></div><script>${js.replace(/<\/script/gi, "<\\/script")}<\/script><script>renderReport(${data}, document.getElementById("app"), {});<\/script></body></html>`;
+      const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${ids.join(" vs ")}</title><style>${css}\nhtml,body{height:auto} body{overflow:auto}</style></head><body><div id="app"></div><script>${js.replace(/<\/script/gi, "<\\/script")}<\/script><script>renderReport(${data}, document.getElementById("app"), {});<\/script><script>if(location.hash=="#pdf"){document.body.classList.add("printing");document.querySelectorAll("details").forEach(x=>x.open=true);document.querySelectorAll("p.help").forEach(x=>x.hidden=false);setTimeout(()=>print(),700)}<\/script></body></html>`;
+      if (o.pdf) { const w = window.open(URL.createObjectURL(new Blob([html], { type: "text/html" })) + "#pdf", "_blank"); return w ? { path: "pdf" } : { error: "El navegador bloqueó la ventana nueva: permití ventanas emergentes para este sitio." }; }
       const a = document.createElement("a");
       a.href = URL.createObjectURL(new Blob([html], { type: "text/html" }));
       a.download = `tandas_${ids.join("_vs_")}.html`;

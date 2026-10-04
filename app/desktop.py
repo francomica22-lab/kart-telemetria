@@ -125,6 +125,23 @@ class Api:
         except Exception as e:
             return {"error": f"No se pudo guardar el setup: {e}"}
 
+    def export_pdf(self):
+        """Abre el reporte en el navegador listo para imprimir / guardar como PDF."""
+        if not self.last:
+            return {"error": "Primero compará tandas."}
+        try:
+            import subprocess, pathlib
+            out_dir = os.path.join(os.path.dirname(os.path.abspath(self._folder() or ".")), "reportes")
+            path = render_html(self.last, out_dir)
+            url = pathlib.Path(path).as_uri() + "#pdf"
+            try:
+                subprocess.Popen(["cmd", "/c", "start", "", "msedge", url], creationflags=0x08000000)
+            except Exception:
+                os.startfile(path)
+            return {"path": path}
+        except Exception as e:
+            return {"error": f"No se pudo preparar el PDF: {e}"}
+
     # ---------- actualizaciones ----------
     def check_update(self):
         self.update = updater.check(VERSION)
