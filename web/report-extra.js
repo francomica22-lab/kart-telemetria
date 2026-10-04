@@ -88,19 +88,18 @@
       h += `<div class="panel"><div class="eyebrow" style="color:${COL[id]};margin-bottom:6px">${NAME(id)} · ${op.vueltas} vueltas analizadas</div>
         <div class="optrow">
           <div><div class="eyebrow">Vuelta óptima</div><div class="big">${op.optima.toFixed(3)}</div><div class="muted small">tus mejores curvas juntas</div></div>
-          <div><div class="eyebrow">Mejor vuelta</div><div class="big">${op.mejor.toFixed(3)}</div><div class="muted small">vuelta ${op.mejor_vuelta} · ${sgn(lost, 3)} s de la óptima</div></div>
-          <div><div class="eyebrow">Promedio</div><div class="big">${op.promedio.toFixed(3)}</div><div class="muted small">${sgn(toAvg, 3)} s de la óptima · ±${op.desvio.toFixed(2)} s entre vueltas</div></div>
+          <div><div class="eyebrow">Mejor vuelta</div><div class="big">${op.mejor.toFixed(3)}</div><div class="muted small">vuelta ${op.mejor_vuelta} · ${sgn(lost, 3)} s</div></div>
+          <div><div class="eyebrow">Promedio</div><div class="big">${op.promedio.toFixed(3)}</div><div class="muted small" title="Desvío entre vueltas: ±${op.desvio.toFixed(2)} s">${sgn(toAvg, 3)} s · ±${op.desvio.toFixed(2)} s</div></div>
         </div>
-        <p class="lead" style="margin-top:12px">Si juntaras tus mejores curvas, la vuelta sería <b>${op.optima.toFixed(3)}</b>: <b>${lost.toFixed(2)} s</b> menos que tu mejor vuelta y <b>${toAvg.toFixed(2)} s</b> menos que tu promedio.</p>
-        ${tips.length ? `<div class="todo"><div class="eyebrow">Repetí lo que ya hiciste bien</div><ul>${tips.map(t => `<li><b>Curva ${t.n}:</b> tu mejor pasada fue en la vuelta ${t.lap}, ${t.gain.toFixed(2)} s mejor que tu promedio${t.why.length ? ": " + t.why.join(", ") : ""}. Intentá repetirlo.</li>`).join("")}</ul></div>` : ""}
-        <ul class="why" style="margin-top:10px">
+        ${tips.length ? `<div class="todo" style="margin-top:12px"><div class="eyebrow">Repetí lo que ya hiciste bien</div><ul class="why compact">${tips.map(t => `<li>${t.why.length ? `<details class="fold"><summary><b>Curva ${t.n}</b> · vuelta ${t.lap} · <span class="g num">−${t.gain.toFixed(2)} s</span> vs tu promedio</summary><div class="fold-body">${t.why.join(", ")}.</div></details>` : `<b>Curva ${t.n}</b> · vuelta ${t.lap} · <span class="g num">−${t.gain.toFixed(2)} s</span> vs tu promedio`}</li>`).join("")}</ul></div>` : ""}
+        <details class="fold subtle" style="margin-top:10px"><summary class="small">Regularidad y ritmo</summary><div class="fold-body"><ul class="why">
           ${irreg.map((c, i) => `<li><b>Curva ${c.n}</b> ${i == 0 ? "es la más irregular" : "le sigue"}: varía ±${c.desvio.toFixed(2)} s entre vueltas${c.desvio_vertice >= 2.5 ? ` y el vértice se mueve ±${c.desvio_vertice.toFixed(0)} m` : ""}${c.desvio_freno != null && c.desvio_freno >= 2.5 ? `; el punto de frenada, ±${c.desvio_freno.toFixed(0)} m` : ""}.</li>`).join("")}
           ${trend != null ? `<li>${Math.abs(trend) < 0.01 ? "El ritmo se mantuvo parejo a lo largo de la tanda." : trend > 0 ? `Cada vuelta fuiste <b>${trend.toFixed(3)} s más lento</b> en promedio: el agarre o el motor caen con las vueltas.` : `Cada vuelta mejoraste ${Math.abs(trend).toFixed(3)} s en promedio: las gomas y la pista fueron entrando.`}</li>` : ""}
-        </ul>
-        <div class="tw" style="margin-top:12px"><table><thead><tr><th>Curva</th><th>Óptima</th><th>Vuelta</th><th>En tu mejor vuelta</th><th>Promedio</th><th>Desvío</th><th>Vértice ±m</th></tr></thead><tbody>
+        </ul></div></details>
+        <details class="fold subtle"><summary class="small">Tabla curva por curva</summary><div class="fold-body tw"><table><thead><tr><th>Curva</th><th>Óptima</th><th>Vuelta</th><th>En tu mejor vuelta</th><th>Promedio</th><th>Desvío</th><th>Vértice ±m</th></tr></thead><tbody>
           ${op.curvas.map(c => `<tr><td>Curva ${c.n}</td><td class="g">${c.mejor.toFixed(3)}</td><td>V${c.mejor_lap}</td><td>${c.en_mejor_vuelta != null ? c.en_mejor_vuelta.toFixed(3) + ` <span class="muted">${sgn(c.en_mejor_vuelta - c.mejor)}</span>` : "–"}</td><td>${c.promedio.toFixed(3)} <span class="muted">${sgn(c.promedio - c.mejor)}</span></td><td>±${c.desvio.toFixed(3)}</td><td>±${c.desvio_vertice.toFixed(1)}</td></tr>`).join("")}
           <tr class="first"><td><b>Vuelta</b></td><td class="g"><b>${op.optima.toFixed(3)}</b></td><td></td><td>${op.mejor.toFixed(3)}</td><td>${op.promedio.toFixed(3)}</td><td>±${op.desvio.toFixed(3)}</td><td></td></tr>
-        </tbody></table></div></div>`;
+        </tbody></table></div></details></div>`;
     }
     return h;
   }
@@ -164,7 +163,7 @@
         el("circle", { cx: X(pk.rpm), cy: Y(pk.hp), r: 7, fill: "none", stroke: COL[c.id], "stroke-width": 2 }, svg);
         txt(svg, X(pk.rpm), Y(pk.hp) - 12, `${pk.hp.toFixed(1)} HP`, { "text-anchor": "middle", style: `fill:${COL[c.id]};font-weight:700;font-size:14px` });
         cards.push(`<div class="mc"><div class="eyebrow" style="color:${COL[c.id]}">${NAME(c.id)}</div><div class="v">${pk.hp.toFixed(1)} HP</div>
-          <div class="s">máximo a ${Math.round(pk.rpm)} rpm · rinde 90% o más entre ${(band[0].rpm / 1000).toFixed(1)}k y ${(band[band.length - 1].rpm / 1000).toFixed(1)}k · aire ${c.P.rho.toFixed(3)} kg/m³</div></div>`);
+          <div class="s" title="Rinde 90% o más del máximo en esa banda. Aire ${c.P.rho.toFixed(3)} kg/m³">a ${Math.round(pk.rpm)} rpm · banda ${(band[0].rpm / 1000).toFixed(1)}k–${(band[band.length - 1].rpm / 1000).toFixed(1)}k</div></div>`);
       }
       root.querySelector(".pp-cards").innerHTML = cards.join("");
       root.querySelector(".pp-leg").innerHTML = curves.map(c => `<span style="--c:${COL[c.id]}">${esc(NAME(c.id))}</span>`).join("") + `<span style="--c:var(--muted)">zona sombreada: banda de potencia (90% del máximo)</span>`;

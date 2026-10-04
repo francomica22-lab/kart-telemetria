@@ -35,10 +35,9 @@
         const s = S[id], w = s.laps.filter(l => s.top.includes(l.t) && l.agua != null).map(l => l.agua);
         return `<div class="sc" style="--c:${COL[id]}"><div class="eyebrow">${s.hour} · ${esc(s.kart)} · <span style="opacity:.7">tanda ${id}</span></div>
           <div class="t">${s.top[0].toFixed(3)}</div>
-          <div class="l">top ${s.top.length}: ${s.top.map(x => x.toFixed(3)).join(" · ")} · prom ${avg(s.top).toFixed(3)}</div>
-          <div class="l">ideal ${s.ideal.toFixed(3)} · punta ${s.vmax} km/h${w.length ? ` · agua ${Math.min(...w).toFixed(0)}–${Math.max(...w).toFixed(0)} °C` : ""}</div>
-          ${(D.clima || {})[id] ? `<div class="l clima" title="Clima en la pista a la hora de la tanda (Open-Meteo)">${KTX.climaTxt(D.clima[id])}</div>` : ""}
-          <div class="cm">${s.comment ? "“" + esc(s.comment.replace(/\n/g, ", ")) + "”" : "<span class='muted'>sin comentario en la tanda</span>"}</div>
+          <div class="l" title="Mejores ${s.top.length}: ${s.top.map(x => x.toFixed(3)).join(" · ")} · ideal (mejores curvas juntas) ${s.ideal.toFixed(3)}">prom ${avg(s.top).toFixed(3)} · ideal ${s.ideal.toFixed(3)}</div>
+          <div class="l stats" title="${(D.clima || {})[id] ? esc(KTX.climaTxt(D.clima[id])) + " · " : ""}punta ${s.vmax} km/h">${(D.clima || {})[id] ? `${D.clima[id].T.toFixed(0)} °C · ` : ""}${s.vmax} km/h${w.length ? ` · agua ${Math.min(...w).toFixed(0)}–${Math.max(...w).toFixed(0)} °C` : ""}</div>
+          ${s.comment ? `<div class="cm" title="${esc(s.comment)}">“${esc(s.comment.replace(/\n/g, ", "))}”</div>` : ""}
           <div class="schips">${KTX.setupChips(D, s)}</div>
           ${opts.saveSetup ? `<button class="link setbtn" data-id="${id}">Editar setup</button>` : ""}</div>`;
       }).join("")}</div>
@@ -83,11 +82,13 @@
         const r = await opts.saveSetup(s, vals);
         if (r && r.error) return r;
         s.setup = s.setup || {}; s.setup.valores = Object.assign({}, s.setup.auto || {}, r && r.valores ? r.valores : vals); s.setup.manual = vals;
-        renderReport(D, root, opts);
+        window.renderReport(D, root, opts);
       });
     }));
 
     /* ---------- conclusiones en palabras ---------- */
+    // una linea corta; el detalle se despliega al tocar
+    const fold = (short, long, cls = "") => long ? `<details class="fold ${cls}"><summary>${short}</summary><div class="fold-body">${long}</div></details>` : `<div class="fold-plain ${cls}">${short}</div>`;
     const f1 = v => Math.abs(v).toFixed(1), f0 = v => Math.abs(v).toFixed(0);
     function reasons(a, b, kind) {
       const r = [], A = a.t3, B = b.t3;
@@ -118,27 +119,30 @@
       const sum = k => lost.filter(p => p.k == k).reduce((a, p) => a + p.d, 0);
       const man = sum("manejo"), agr = sum("agarre"), mix = sum("mixto");
       const mixTxt = mix >= 0.02 ? ` Otros ${mix.toFixed(2)} s están en zona gris: no se puede separar manejo de agarre.` : "";
-      const verdict = !lost.length ? "No hay curvas donde pierda tiempo de forma clara." :
-        man >= 2 * agr && man >= mix ? `<b>La mayor parte es manejo</b> (${man.toFixed(2)} s); el agarre explica ${agr.toFixed(2)} s.${mixTxt}` :
-        agr >= 2 * man && agr >= mix ? `<b>La mayor parte es agarre</b> (${agr.toFixed(2)} s): gomas, pista o setup. El manejo explica ${man.toFixed(2)} s.${mixTxt}` :
-        mix > man && mix > agr ? `<b>No se puede separar con claridad</b>: ${mix.toFixed(2)} s en zona gris, ${man.toFixed(2)} s de manejo y ${agr.toFixed(2)} s de agarre.` :
-        `<b>Se reparte entre manejo</b> (${man.toFixed(2)} s) <b>y agarre</b> (${agr.toFixed(2)} s).${mixTxt}`;
-      const g = Math.abs(gap) < 0.01 ? "<b>igual de rápida</b>" : `<b>${Math.abs(gap).toFixed(3)} s ${gap > 0 ? "más lenta" : "más rápida"}</b>`;
+      const verdict = !lost.length ? "sin curvas con pérdida clara" :
+        man >= 2 * agr && man >= mix ? `<b>sobre todo manejo</b>` :
+        agr >= 2 * man && agr >= mix ? `<b>sobre todo agarre</b>` :
+        mix > man && mix > agr ? `<b>difícil de separar</b>` : `<b>manejo y agarre</b>`;
+      const split = lost.length ? `<span class="chip manejo">manejo ${man.toFixed(2)} s</span> <span class="chip agarre">agarre ${agr.toFixed(2)} s</span>${mix >= 0.02 ? ` <span class="chip mixto">zona gris ${mix.toFixed(2)} s</span>` : ""}` : "";
+      const g = Math.abs(gap) < 0.01 ? "<b>igual</b>" : `<b>${gap > 0 ? "+" : "−"}${Math.abs(gap).toFixed(3)} s</b> por vuelta`;
       const items = lost.slice(0, 3).map(p => {
         const r = reasons(p.a, p.b, p.k);
         if (!r.length) {
           const prev = C.find(c => c.n == p.n - 1);
           const dPrev = prev ? prev.by[id].t3.v_salida - prev.by[REF].t3.v_salida : 0;
           r.push(dPrev <= -0.8 ? `llega más lento porque sale ${f1(dPrev)} km/h más lento de la curva ${p.n - 1}` : "la diferencia se reparte a lo largo de la curva, sin un punto claro");
-        } return `<li><b>Curva ${p.n}</b> <span class="b num">+${p.d.toFixed(2)} s</span> <span class="chip ${p.k}">${p.k}</span>${r.length ? " " + r.slice(0, 3).join(", ") + "." : ""}</li>`; });
+        }
+        const t = advice(p.a, p.b);
+        return `<li>${fold(`<b>Curva ${p.n}</b> <span class="b num">+${p.d.toFixed(2)} s</span> <span class="chip ${p.k}">${p.k}</span> <span class="ink2">${r[0]}</span>`,
+          (r.length > 1 ? `<p>También ${r.slice(1).join(", ")}.</p>` : "") + (t.length && p.k == "manejo" ? `<p><b>Para mejorar:</b> ${t.join("; ")}.</p>` : ""))}</li>`; });
       const adv = lost.filter(p => p.k == "manejo").slice(0, 3).map(p => { const t = advice(p.a, p.b); return t.length ? `<li><b>Curva ${p.n}:</b> ${t.join("; ")}.</li>` : ""; }).join("");
       const sd = KTX.setupDiff(D, S[REF], S[id]);
       const cl = (D.clima || {}), climaNote = cl[id] && cl[REF] && Math.abs(cl[id].T - cl[REF].T) >= 3 ? ` La pista estaba más ${cl[id].T > cl[REF].T ? "caliente" : "fría"}: ${cl[REF].T.toFixed(0)} °C → ${cl[id].T.toFixed(0)} °C de aire.` : "";
-      return `<p class="lead">La ${TAG(id)} es ${g} por vuelta que la ${TAG(REF)}. ${verdict}</p>
-        ${sd.length ? `<p class="small ink2"><b>Cambios de setup</b> de la ${BT(REF)} a la ${BT(id)}: ${sd.map(esc).join("; ")}.${climaNote}</p>` : climaNote ? `<p class="small ink2">${climaNote.trim()}</p>` : ""}
-        ${items.length ? `<ul class="why">${items.join("")}</ul>` : ""}
-        ${won.length ? `<p class="ink2 small">Gana en ${won.map(p => `curva ${p.n} (${sgn(p.d)} s)`).join(", ")}.</p>` : ""}
-        ${adv ? `<div class="todo"><div class="eyebrow">Para trabajar</div><ul>${adv}</ul></div>` : ""}`;
+      return `<p class="lead">${TAG(id)} ${g} que ${TAG(REF)} · ${verdict}</p>
+        <div>${split}</div>
+        ${items.length ? `<ul class="why compact">${items.join("")}</ul>` : ""}
+        ${won.length ? `<p class="ink2 small">Gana en ${won.map(p => `C${p.n} (${sgn(p.d)} s)`).join(", ")}.</p>` : ""}
+        ${sd.length || climaNote ? fold(`<span class="small">Cambios entre tandas${sd.length ? ` · ${sd.length} de setup` : ""}${climaNote ? " · clima" : ""}</span>`, `${sd.length ? `<p>${sd.map(esc).join("<br>")}</p>` : ""}${climaNote ? `<p>${climaNote.trim()}</p>` : ""}`, "subtle") : ""}`;
     }
     function motorConclusion(id) {
       const c = M.compare.find(x => x.ses == id); if (!c) return "";
@@ -167,24 +171,27 @@
       const hp = KTX.hpDelta(ctx, id, d.pct);
       if (d.real) {
         const win = d.pct > 0 ? id : REF, lose = win == id ? REF : id;
-        lead = `<b>La unidad de potencia rindió más en la ${TAG(win)}:</b>${hp != null ? ` unos <b>${f1(hp)} HP</b> más,` : ""} a igual RPM acelera <b>${f1(d.pct)}% más</b> en ${gn} ${range} (margen ±${(d.margin ?? 2 * d.se).toFixed(1)}%${d.vueltas ? `, medido en ${d.vueltas[0]} y ${d.vueltas[1]} vueltas` : ""}).`;
+        lead = `Rindió más la ${TAG(win)}: <b>${hp != null ? `+${f1(hp)} HP · ` : ""}+${f1(d.pct)}%</b> <span class="muted small">(±${(d.margin ?? 2 * d.se).toFixed(1)}%)</span>`;
+        why.unshift(`A igual RPM acelera ${f1(d.pct)}% más en ${gn}, ${range}${d.vueltas ? `, medido en ${d.vueltas[0]} y ${d.vueltas[1]} vueltas` : ""}.`);
         notes.unshift("Si el motor fue el mismo, una diferencia así suele venir de la carburación, la temperatura o humedad del aire, el viento en las rectas, la presión de las gomas o el peso. No significa necesariamente que un motor sea mejor que otro.");
         if (Math.abs(dv) >= 0.5) why.push(`${(dv > 0) == (win == id) ? "Lo confirma la punta" : "Sin embargo, la punta va al revés"}: ${S[win].vmax} contra ${S[lose].vmax} km/h.`);
       } else {
-        lead = `<b>No hay una diferencia clara de rendimiento de motor.</b> En ${gn}, a igual RPM, la aceleración difiere ${sgn(d.pct, 1)}% y el margen de la medición es ±${(d.margin ?? 2 * d.se).toFixed(1)}%${d.vueltas ? ` (${d.vueltas[0]} y ${d.vueltas[1]} vueltas)` : ""}.`;
+        lead = `<b>Motor parejo</b> <span class="muted small">(${sgn(d.pct, 1)}%, margen ±${(d.margin ?? 2 * d.se).toFixed(1)}%)</span>`;
+        why.unshift(`En ${gn}, a igual RPM, la aceleración difiere ${sgn(d.pct, 1)}% y el margen de la medición es ±${(d.margin ?? 2 * d.se).toFixed(1)}%${d.vueltas ? ` (${d.vueltas[0]} y ${d.vueltas[1]} vueltas)` : ""}: no alcanza para decir que haya diferencia.`);
         why.push(`Punta: ${S[REF].vmax} km/h la ${BT(REF)} y ${S[id].vmax} km/h la ${BT(id)}${Math.abs(dv) < 1 ? ", prácticamente igual" : ""}.`);
       }
       for (const [k, b] of Object.entries(c.bands)) if (b && b.real) { const [lo, hi] = k.split("-"); why.push(`De ${(lo / 1000).toFixed(1)}k a ${(hi / 1000).toFixed(1)}k rpm la ${BT(id)} sube ${f1(b.pct)}% más ${b.pct < 0 ? "rápido" : "lento"}.`); }
       if (!Object.values(c.bands).some(b => b && b.real)) why.push("Las subidas de RPM por salida de curva no muestran diferencias claras.");
-      return `<p class="lead">${lead}</p><ul class="why">${why.concat(notes).map(x => `<li>${x}</li>`).join("")}</ul>`;
+      return `<p class="lead">${lead}</p>${fold(`<span class="small">Por qué</span>`, `<ul class="why">${why.concat(notes).map(x => `<li>${x}</li>`).join("")}</ul>`, "subtle")}`;
     }
     // alertas de motor: cortes de RPM repetidos en la misma curva
     const alertsHTML = (() => {
       const items = IDS.flatMap(id => (((M.sessions[id] || {}).fallas || {}).grupos || []).filter(g => g.n >= 2 && g.curva).map(g => ({ id, g, f: M.sessions[id].fallas })));
       if (!items.length) return "";
       return `<div class="panel alert"><div class="alert-h"><span class="bang">!</span><h2>Posible falla de motor</h2></div>
-        <ul class="why">${items.map(({ id, g, f }) => `<li>En la ${TAG(id)}, en la <b>curva ${g.curva}</b>: en ${g.n} de ${f.vueltas} vueltas (vuelta ${g.vueltas.join(", ")}) las RPM se cortan de golpe unas ${g.caida} rpm a ${g.kmh} km/h y vuelven, <b>sin que cambie la velocidad</b>. No es un cambio de marcha: es el motor que falla un instante.</li>`).join("")}</ul>
-        <p class="small ink2">Suele venir del encendido (bujía, pipa o cable), de la carburación en baja o de un falso contacto en el cable de RPM. Si pasa siempre en el mismo lugar, mirá qué tiene de particular esa curva (vibración, pianito, régimen bajo).</p></div>`;
+        <ul class="why compact">${items.map(({ id, g, f }) => `<li>${fold(`${TAG(id)} · <b>curva ${g.curva}</b> · vueltas ${g.vueltas.join(", ")} · <b>−${g.caida} rpm</b>`,
+          `<p>En ${g.n} de ${f.vueltas} vueltas las RPM se cortan de golpe unas ${g.caida} rpm a ${g.kmh} km/h y vuelven, sin que cambie la velocidad. No es un cambio de marcha: es el motor que falla un instante.</p>
+           <p>Suele venir del encendido (bujía, pipa o cable), de la carburación en baja o de un falso contacto en el cable de RPM. Si pasa siempre en el mismo lugar, mirá qué tiene de particular esa curva (vibración, pianito, régimen bajo).</p>`)}</li>`).join("")}</ul></div>`;
     })();
     const conclusionsHTML = which => others.map(id => `<div class="concl">${others.length > 1 ? `<div class="eyebrow">${NAME(id)} contra ${NAME(REF)}</div>` : ""}${which == "m" ? motorConclusion(id) : driveConclusion(id)}</div>`).join("");
 
@@ -261,19 +268,19 @@
     (() => {
       const box = root.querySelector(".simple");
       const tipFor = (p) => {
-        if (p.k == "agarre") return "Acá el kart agarró menos que en la otra tanda. No es tu manejo: revisá gomas, presiones o puesta a punto.";
+        if (p.k == "agarre") return "El kart agarró menos: revisá gomas o setup (no es manejo).";
         const A = p.a.t3, B = p.b.t3, t = [];
-        if (B.s_vmin - A.s_vmin <= -4) t.push("girá un poco más tarde: esperá antes de buscar el vértice (la parte de adentro de la curva)");
+        if (B.s_vmin - A.s_vmin <= -4) t.push("girá más tarde: esperá el vértice");
         if (B.freno_max - A.freno_max <= -0.12) t.push("frená más fuerte y más corto");
         if (A.s_acel != null && B.s_acel != null && B.s_acel - A.s_acel >= 4) t.push("volvé a acelerar antes");
-        if (Math.abs(B.off_apex - A.off_apex) >= 0.6) t.push(`repetí la trayectoria de la ${BT(REF)}`);
-        if (!t.length && B.v_salida - A.v_salida <= -0.8) t.push("priorizá salir rápido de la curva, aunque entres un poco más lento");
+        if (Math.abs(B.off_apex - A.off_apex) >= 0.6) t.push(`repetí la línea de la ${BT(REF)}`);
+        if (!t.length && B.v_salida - A.v_salida <= -0.8) t.push("priorizá la salida");
         if (!t.length) {
           const prev = C.find(c => c.n == p.n - 1);
           if (prev && prev.by[p.id].t3.v_salida - prev.by[REF].t3.v_salida <= -0.8) t.push(`llegás lento porque salís lento de la curva ${p.n - 1}: mejorá esa salida`);
         }
-        if (!t.length) return p.k == "mixto" ? "Acá se mezcla manejo y agarre: probá repetir la línea de tu mejor tanda." : "Pequeña diferencia repartida en toda la curva.";
-        const txt = t.join(", y ");
+        if (!t.length) return p.k == "mixto" ? "Manejo y agarre mezclados: repetí la línea de tu mejor tanda." : "Pequeña diferencia repartida en toda la curva.";
+        const txt = t.join(" y ");
         return txt.charAt(0).toUpperCase() + txt.slice(1) + ".";
       };
       const motorSimple = id => {
@@ -298,7 +305,7 @@
           <div class="sp-head">
             <div class="eyebrow">${NAME(id)} contra ${NAME(REF)}</div>
             <p class="sp-big">La ${TAG(slower)} fue <b>${Math.abs(gap).toFixed(2)} s más lenta</b> por vuelta que la ${TAG(faster)}.</p>
-            <p class="ink2">En una tanda de 10 vueltas son unos ${(Math.abs(gap) * 10).toFixed(1)} s.</p>
+            <p class="ink2 small">≈ ${(Math.abs(gap) * 10).toFixed(1)} s en 10 vueltas</p>
           </div>
           <div class="sp-grid">
             <div class="panel sp-map"><div class="eyebrow">Dónde se pierde tiempo</div><svg viewBox="-30 -20 360 380" data-id="${id}"></svg>
@@ -545,5 +552,28 @@
       P(3).querySelector(".laptbl").innerHTML = h + "</tbody>";
     })();
   }
-  window.renderReport = renderReport;
+  // Las explicaciones de cada seccion quedan detras de un boton (i): al pasar el mouse se lee, al tocar queda abierta.
+  function compactHelp(root) {
+    root.querySelectorAll(".panel").forEach(panel => {
+      const h = panel.querySelector(":scope > h2, :scope > .sec-head > h2");
+      if (!h || h.querySelector(".info")) return;
+      let p = (h.parentElement.classList.contains("sec-head") ? h.parentElement : h).nextElementSibling;
+      while (p && p.tagName == "P" && p.classList.contains("ink2") && !p.classList.contains("lead")) {
+        const help = p; p = p.nextElementSibling;
+        help.classList.add("help"); help.hidden = true;
+        const b = document.createElement("button");
+        b.className = "info"; b.type = "button"; b.textContent = "i"; b.title = help.textContent.trim(); b.setAttribute("aria-label", "Qué muestra esta sección");
+        b.addEventListener("click", () => { help.hidden = !help.hidden; b.classList.toggle("on", !help.hidden); });
+        h.appendChild(b);
+        break;
+      }
+    });
+    root.querySelectorAll("p.note").forEach(n => {
+      const d = document.createElement("details"); d.className = "fold subtle";
+      d.innerHTML = `<summary class="small">Cómo se calcula</summary><div class="fold-body"></div>`;
+      n.replaceWith(d); d.querySelector(".fold-body").appendChild(n);
+    });
+  }
+  const _render = renderReport;
+  window.renderReport = (D, root, opts) => { _render(D, root, opts); compactHelp(root); };
 })();
