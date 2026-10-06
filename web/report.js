@@ -320,7 +320,7 @@
                 ${lost.length ? `<ol class="tips">${lost.slice(0, 3).map(p => `<li><span class="tc">Curva ${p.n}<small>+${p.d.toFixed(2)} s</small></span><span>${tipFor(p)}</span></li>`).join("")}</ol>` : `<p>No hay curvas donde se pierda tiempo de forma clara.</p>`}
                 ${won.length ? `<p class="ink2 small" style="margin-top:10px">Bien hecho en ${won.map(p => "la curva " + p.n).join(" y ")}: ahí la ${BT(id)} fue más rápida.</p>` : ""}
               </div>
-              <div class="panel"><div class="eyebrow" style="margin-bottom:6px">Motor</div><p>${motorSimple(id)}</p></div>
+              <div class="panel"><div class="eyebrow" style="margin-bottom:6px">Motor</div><p>${motorSimple(id)}</p>${KTX.carbSimple(ctx)}</div>
               ${KTX.simpleOptimo(ctx, id)}
             </div>
           </div>
@@ -491,6 +491,7 @@
       ${others.length ? `<div class="panel conclusion"><h2>Conclusión · motor</h2>${conclusionsHTML("m")}</div>` : ""}
       ${cmpCards}
       ${KTX.powerPanel(ctx)}
+      ${KTX.carbPanel(ctx)}
       <div class="grid2b">
         <div class="panel"><h2>Subidas de RPM por salida de curva</h2>
           <p class="ink2">Mediana del tiempo para subir cada banda, separado por marcha y por curva de salida para comparar igual con igual. Menos es mejor.</p>

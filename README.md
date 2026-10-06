@@ -15,6 +15,7 @@ Compará tandas de la **AiM MyChron** (archivos `.xrk`) curva por curva: cuánto
 - **Motor**: curva de potencia estimada en HP (todas las vueltas), comparación con margen de error y corrección por clima.
 - **Clima automático** (Open-Meteo) por ubicación GPS y hora de la tanda.
 - **Setup**: se lee del comentario de la MyChron y se puede editar (se guarda junto al `.xrk`).
+- **Carburación**: en cada recta compara dónde llega el pico de RPM contra el de velocidad (más de 5 m antes = gordo, después = fino).
 - **Transmisión**: sugiere la corona según las RPM al final de la recta.
 - **Sensores**: agua, escape, batería y lo que haya registrado la MyChron.
 - **Video**: sincroniza el onboard con la telemetría escuchando el motor; dos videos se mueven juntos por posición en pista.

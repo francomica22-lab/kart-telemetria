@@ -204,6 +204,96 @@ def _fallas(d, corners):
     return dict(eventos=ev[:200], grupos=grupos, vueltas=nlaps)
 
 
+CARB_UMBRAL = 5.0  # metros
+
+
+def _pasadas(D, a, largo, ref_len):
+    """Cada pasada por el tramo [a, a+largo] (puede cruzar la linea de largada: se sigue en la vuelta siguiente)."""
+    rel = (D.s.values - a) % ref_len
+    m = (rel <= largo) & np.isfinite(D.s.values)
+    idx = np.where(m)[0]
+    if not len(idx):
+        return
+    t, r = D.t.values[idx], rel[idx]
+    cut = np.where((np.diff(t) > 300) | (np.diff(r) < -30) | (np.diff(idx) > 3))[0] + 1
+    for part in np.split(idx, cut):
+        if len(part) >= 15:
+            yield D.iloc[part].assign(rel=rel[part])
+
+
+def _pico(y, pos):
+    """Posicion del maximo con interpolacion parabolica (mejor que una muestra); None si cae en un borde."""
+    i = int(np.argmax(y))
+    if i <= 1 or i >= len(y) - 2:
+        return None
+    den = y[i - 1] - 2 * y[i] + y[i + 1]
+    off = 0.5 * (y[i - 1] - y[i + 1]) / den if den < 0 else 0.0
+    off = float(np.clip(off, -1, 1))
+    j = i + off
+    return float(np.interp(j, np.arange(len(pos)), pos))
+
+
+def _carburacion(d, corners, ref_len, min_len=80):
+    """Regla de pista: en cada recta, donde cae el pico de RPM contra el pico de velocidad.
+    Pico de RPM mas de 5 m antes que el de velocidad = rico (gordo); mas de 5 m despues = pobre (fino).
+    delta = s(pico velocidad) - s(pico RPM), en metros; positivo = rico."""
+    if not corners or not d.s.notna().any():
+        return None
+    cs = sorted(corners, key=lambda c: c["s_start"])
+    D = d.sort_values("t").reset_index(drop=True)
+    rectas = []
+    for i, c in enumerate(cs):
+        prev = cs[i - 1]
+        a, b = prev["s_apex"], c["s_start"] + 20          # desde el vertice anterior hasta entrar a la curva
+        largo = (b - a) % ref_len
+        if largo < min_len:
+            continue
+        deltas, vmax = [], []
+        for x in _pasadas(D, a, largo, ref_len):
+            # solo el tramo continuo en la marcha de la velocidad maxima: el cambio a mitad de recta
+            # (pico en 1ra) y la rebajada al frenar (pico al pasar a 1ra) dan picos falsos de RPM
+            g = x.gear.values
+            iv0 = int(np.argmax(x.kmh.values))
+            gf = g[iv0]
+            if gf == 0:
+                continue
+            same = lambda j, step: 0 <= j < len(g) and (g[j] == gf or (g[j] == 0 and 0 <= j + step < len(g) and g[j + step] == gf))
+            k, j = iv0, iv0
+            while same(k - 1, -1):
+                k -= 1
+            while same(j + 1, 1):
+                j += 1
+            x = x.iloc[k:j + 1]
+            if len(x) < 9:
+                continue
+            rpm = savgol_filter(x.rpm.values, 7, 2)
+            kmh = savgol_filter(x.kmh.values, 7, 2)
+            pr, pv = _pico(rpm, x.rel.values), _pico(kmh, x.rel.values)
+            if pr is None or pv is None:                      # el pico tiene que estar dentro del tramo
+                continue
+            deltas.append(pv - pr)
+            vmax.append(float(kmh.max()))
+        if len(deltas) < 3:
+            continue
+        v = np.array(deltas)
+        q1, q3 = np.percentile(v, [25, 75])
+        iqr = max(q3 - q1, 2.0)
+        ok = v[(v >= q1 - 1.5 * iqr) & (v <= q3 + 1.5 * iqr)]
+        rectas.append(dict(curva=c["n"], largo=round(float(largo)), n=int(len(ok)), descartadas=int(len(v) - len(ok)),
+                           delta=round(float(ok.mean()), 1), desvio=round(float(ok.std(ddof=1)) if len(ok) > 1 else 0.0, 1),
+                           kmh=round(float(np.median(vmax)), 1), valores=[round(float(x), 1) for x in v]))
+    if not rectas:
+        return None
+    w = np.array([r["n"] for r in rectas], float)
+    dl = np.array([r["delta"] for r in rectas])
+    delta = float((dl * w).sum() / w.sum())
+    sd = np.sqrt(sum(r["desvio"] ** 2 * r["n"] for r in rectas) / w.sum())
+    se = float(sd / np.sqrt(w.sum()))
+    estado = "rico" if delta > CARB_UMBRAL else "pobre" if delta < -CARB_UMBRAL else "ok"
+    return dict(delta=round(delta, 1), se=round(se, 1), estado=estado, umbral=CARB_UMBRAL, rectas=rectas, n=int(w.sum()),
+                pocos=bool(w.sum() < 6))
+
+
 def _shifts(d):
     out = []
     for lap, q in d.groupby("lap"):
@@ -233,6 +323,7 @@ def analyze(S, laps_by_ses, ref_id, ref_len, corners, bands=None):
             dyno={g: _dyno(d, g) for g in gears},
             potencia=_power_bins(d), transmision=_transmision(d, corners, gears), n_vueltas=int(d.lap.nunique()),
             fallas=_fallas(d, corners),
+            carburacion=_carburacion(d, corners, ref_len),
             bands={k: (dict(n=len(e), median=float(e.dur.median()), p25=float(e.dur.quantile(.25)), p75=float(e.dur.quantile(.75)),
                             by_gear={int(g): dict(n=len(x), median=float(x.dur.median())) for g, x in e.groupby("gear")})
                        if len(e) else dict(n=0)) for k, e in ev.items()},

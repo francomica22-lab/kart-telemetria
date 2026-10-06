@@ -356,3 +356,7 @@ p.help{font-size:13px;color:var(--ink2);margin:4px 0 8px;max-width:85ch}
   .pane[data-p="0"]{break-before:auto}
   a{color:#111}
 }
+/* carburacion */
+.carbp svg.carb{width:100%;max-width:680px;height:auto;display:block;margin:6px 0 4px}
+.carb-l li{line-height:1.6}
+@media (max-width:640px){.carbp svg.carb text{font-size:24px}}

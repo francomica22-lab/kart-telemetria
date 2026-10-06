@@ -123,6 +123,60 @@
     const peso = +(((s.setup || {}).valores || {}).peso) || store.get(pesoKey(s), null) || pesoCat(s.kart) || 175;
     return { m: peso, cda: st.cda || 0.55, crr: st.crr || 0.025, rho: c ? c.rho : 1.2 };
   }
+  /* ---------- carburacion: pico de RPM contra pico de velocidad en recta ---------- */
+  const CARB = { rico: ["Gordo (rico)", "bad"], pobre: ["Fino (pobre)", "bad"], ok: ["En punto", "good"] };
+  const carbDonde = c => Math.abs(c.delta) < 0.5 ? "en el mismo lugar que el de velocidad" : `${f1(c.delta)} m ${c.delta > 0 ? "antes" : "después"} que el de velocidad`;
+  function carbSimple(ctx) {
+    const { IDS, M, BT } = ctx, xs = IDS.filter(id => M.sessions[id].carburacion);
+    if (!xs.length) return "";
+    return `<p class="small ink2" style="margin-top:6px">Carburación: ${xs.map(id => { const c = M.sessions[id].carburacion; return `${xs.length > 1 ? BT(id) + " " : ""}<b>${CARB[c.estado][0].toLowerCase()}</b> (${sgn(c.delta, 1) || "0"} m${c.pocos ? ", pocos datos" : ""})`; }).join(" · ")}</p>`;
+  }
+  function carbPanel(ctx) {
+    const { IDS, M, COL, BT } = ctx, xs = IDS.filter(id => M.sessions[id].carburacion);
+    if (!xs.length) return "";
+    const U = M.sessions[xs[0]].carburacion.umbral, R = 15, W = 620, H = 40 + xs.length * 32 + 72;
+    const X = v => 44 + (Math.max(-R, Math.min(R, v)) + R) / (2 * R) * (W - 88), y0 = 22 + xs.length * 32;
+    let svg = `<svg class="carb" viewBox="0 0 ${W} ${H}" role="img" aria-label="Escala de carburación">
+      <rect x="${X(-R)}" y="${y0}" width="${X(-U) - X(-R)}" height="14" fill="var(--bad)" opacity=".18"/>
+      <rect x="${X(-U)}" y="${y0}" width="${X(U) - X(-U)}" height="14" fill="var(--good)" opacity=".22"/>
+      <rect x="${X(U)}" y="${y0}" width="${X(R) - X(U)}" height="14" fill="var(--bad)" opacity=".18"/>
+      ${[-R, -U, 0, U, R].map(v => `<line x1="${X(v)}" x2="${X(v)}" y1="${y0 + 14}" y2="${y0 + 20}" stroke="var(--muted)"/><text x="${X(v)}" y="${y0 + 44}" text-anchor="middle" font-size="15" fill="var(--muted)">${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v)} m</text>`).join("")}
+      <text x="${X(-R) - 30}" y="${y0 + 74}" font-size="16" fill="var(--ink2)">← Fino (pobre)</text>
+      <text x="${X(0)}" y="${y0 + 74}" font-size="16" fill="var(--ink2)" text-anchor="middle">En punto</text>
+      <text x="${X(R) + 30}" y="${y0 + 74}" font-size="16" fill="var(--ink2)" text-anchor="end">Gordo (rico) →</text>`;
+    xs.forEach((id, i) => {
+      const c = M.sessions[id].carburacion, x = X(c.delta), e = Math.min(c.se * 2, R), ty = 20 + i * 32;
+      svg += `<line x1="${X(c.delta - e)}" x2="${X(c.delta + e)}" y1="${y0 + 7}" y2="${y0 + 7}" stroke="${COL[id]}" stroke-width="3"/>
+        <line x1="${x}" x2="${x}" y1="${ty + 4}" y2="${y0 + 7}" stroke="${COL[id]}" stroke-width="1" opacity=".5"/>
+        <circle cx="${x}" cy="${y0 + 7}" r="8" fill="${COL[id]}" stroke="var(--panel)" stroke-width="2"/>
+        <text x="${x}" y="${ty}" text-anchor="${x < 90 ? "start" : x > W - 90 ? "end" : "middle"}" font-size="17" font-weight="600" fill="${COL[id]}">${xs.length > 1 ? BT(id) + " · " : ""}${sgn(c.delta, 1) || "0"} m</text>`;
+    });
+    svg += "</svg>";
+    const tip = c => c.estado == "rico" ? "Probá empobrecer un punto y volvé a medir."
+      : c.estado == "pobre" ? "Probá enriquecer un punto: andar fino arriesga el motor (pistón, aros)." : "";
+    const lines = xs.map(id => {
+      const c = M.sessions[id].carburacion, [lbl, cls] = CARB[c.estado];
+      return `<li>${xs.length > 1 ? `<span class="dot" style="--c:${COL[id]}"></span><b>${BT(id)}</b> · ` : ""}<span class="chip ${cls}">${lbl}</span>
+        el pico de RPM llega ${carbDonde(c)} <span class="muted small">(±${f1(c.se * 2)} m · ${c.n} pasadas${c.pocos ? " · pocos datos, tomalo con cuidado" : ""})</span>${tip(c) ? `<br><span class="small ink2">${tip(c)}</span>` : ""}</li>`;
+    }).join("");
+    let diff = "";
+    if (xs.length > 1) {
+      const a = M.sessions[xs[0]].carburacion, b = M.sessions[xs[1]].carburacion, dd = b.delta - a.delta, m = 2 * Math.hypot(a.se, b.se);
+      diff = Math.abs(dd) > Math.max(m, 2) ? `<p class="small">Entre tandas: la ${BT(xs[1])} está ${f1(dd)} m más ${dd > 0 ? "gorda" : "fina"} que la ${BT(xs[0])}.</p>`
+        : `<p class="small ink2">Entre tandas no hay diferencia medible de carburación.</p>`;
+    }
+    const det = xs.map(id => {
+      const c = M.sessions[id].carburacion;
+      return `<div class="tw"><table><thead><tr><th>${xs.length > 1 ? `<span class="dot" style="--c:${COL[id]}"></span>${BT(id)} · ` : ""}Recta antes de</th><th>Largo</th><th>Vel. máx</th><th>RPM antes que vel.</th><th>Desvío</th><th>Pasadas</th></tr></thead><tbody>${
+        c.rectas.map(r => `<tr><td>Curva ${r.curva}</td><td>${r.largo} m</td><td>${r.kmh.toFixed(0)} km/h</td><td><b>${sgn(r.delta, 1) || "0"} m</b></td><td>±${r.desvio.toFixed(1)} m</td><td>${r.n}${r.descartadas ? ` <span class="muted">(+${r.descartadas} descartadas)</span>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
+    }).join("");
+    return `<div class="panel carbp"><h2>Carburación</h2>
+      <p class="ink2">En cada recta: dónde llega el pico de RPM comparado con el pico de velocidad. Si el de RPM llega más de ${U} m antes, está gordo; si llega más de ${U} m después, fino.</p>
+      ${svg}<ul class="why compact carb-l">${lines}</ul>${diff}
+      <details class="fold subtle"><summary><span class="small">Detalle por recta y cómo se mide</span></summary><div class="fold-body">${det}
+        <p class="note">Se mide en todas las pasadas por cada recta de más de 80 m, solo en la última marcha (un cambio a mitad de recta o la rebajada al frenar dan picos falsos). Los valores fuera de lo normal se descartan (rango intercuartil) y se promedia. Positivo = el pico de RPM llega antes. El ± es el margen del promedio (95%). En marcha fija las RPM y la velocidad van atadas, así que las diferencias suelen ser de pocos metros: comparar tandas con el mismo motor es lo más útil.</p></div></details></div>`;
+  }
+
   function powerPanel(ctx) {
     return `<div class="panel"><div class="sec-head"><h2>Curva de potencia</h2>
         <details class="settings pp"><summary>Ajustes del cálculo</summary><div class="opts">
@@ -521,5 +575,5 @@
     root.querySelector(".csim").innerHTML = others.length ? `<div class="tw"><table><thead><tr><th>Circuito</th><th>Parecido</th><th>Largo</th><th>V media</th><th>Curvas</th><th>Agarre</th></tr></thead><tbody>${others.map(o => `<tr title="${esc(o.resumen)}"><td>${esc(o.nombre || "–")}</td><td class="${o.sim >= 75 ? "g" : ""}">${o.sim}%</td><td>${o.largo} m</td><td>${o.v_media} km/h</td><td>${o.curvas}</td><td>${o.grip} g</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted small">Todavía no hay otros circuitos guardados. Cuando analices tandas de otra pista, aparece acá cuánto se parece a ${esc(c.nombre || "esta")}.</p>`;
   }
 
-  window.KTX = { circuitPane, wireCircuit, circuitSummary, audioSpectrum, spectralSync, setupDiff, setupChips, setupModal, climaTxt, optimoPane, simpleOptimo, optimoTips, lapTrend, powerPanel, drawPower, hpDelta, transPane, wireTrans, sensorsPane, drawWater, videoPane, wireVideo, store };
+  window.KTX = { circuitPane, wireCircuit, circuitSummary, audioSpectrum, spectralSync, setupDiff, setupChips, setupModal, climaTxt, optimoPane, simpleOptimo, optimoTips, lapTrend, powerPanel, drawPower, hpDelta, carbPanel, carbSimple, transPane, wireTrans, sensorsPane, drawWater, videoPane, wireVideo, store };
 })();
