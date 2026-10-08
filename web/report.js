@@ -95,25 +95,32 @@
     // una linea corta; el detalle se despliega al tocar
     const fold = (short, long, cls = "") => long ? `<details class="fold ${cls}"><summary>${short}</summary><div class="fold-body">${long}</div></details>` : `<div class="fold-plain ${cls}">${short}</div>`;
     const f1 = v => Math.abs(v).toFixed(1), f0 = v => Math.abs(v).toFixed(0);
+    // diferencia de posicion (vertice, frenada, aceleracion, linea) solo si supera el minimo y el margen de error entre vueltas
+    const posDiff = (a, b, k, min) => {
+      const A = a.t3[k], B = b.t3[k]; if (A == null || B == null) return 0;
+      const pa = (a.pos || {})[k], pb = (b.pos || {})[k], d = B - A;
+      const m = pa && pb && pa[1] > 1 && pb[1] > 1 ? 2 * Math.sqrt(pa[0] ** 2 / pa[1] + pb[0] ** 2 / pb[1]) : 0;
+      return Math.abs(d) >= Math.max(min, m) ? d : 0;
+    };
     function reasons(a, b, kind) {
       const r = [], A = a.t3, B = b.t3;
       if (kind == "mixto") r.push(`la G lateral queda cerca pero por debajo de la otra (${b.lat_ses_max.toFixed(2)} g contra ${a.lat_ses_max.toFixed(2)} g)`);
       if (kind == "agarre") r.push(`en ninguna vuelta llegó a la G lateral de la otra (${b.lat_ses_max.toFixed(2)} g contra ${a.lat_ses_max.toFixed(2)} g)`);
-      const dAp = B.s_vmin - A.s_vmin; if (Math.abs(dAp) >= 4) r.push(`hace el vértice ${f0(dAp)} m ${dAp < 0 ? "antes" : "más tarde"}`);
+      const dAp = posDiff(a, b, "s_vmin", 4); if (dAp) r.push(`hace el vértice ${f0(dAp)} m ${dAp < 0 ? "antes" : "más tarde"}`);
       const dV = B.v_min - A.v_min; if (Math.abs(dV) >= 0.7) r.push(`pasa ${f1(dV)} km/h más ${dV < 0 ? "lento" : "rápido"} por el vértice`);
       const dO = B.v_salida - A.v_salida; if (Math.abs(dO) >= 0.8) r.push(`sale ${f1(dO)} km/h más ${dO < 0 ? "lento" : "rápido"}`);
-      if (A.s_freno != null && B.s_freno != null) { const dB = B.s_freno - A.s_freno; if (Math.abs(dB) >= 3) r.push(`frena ${f0(dB)} m ${dB < 0 ? "antes" : "más tarde"}`); }
+      { const dB = posDiff(a, b, "s_freno", 3); if (dB) r.push(`frena ${f0(dB)} m ${dB < 0 ? "antes" : "más tarde"}`); }
       const dG = B.freno_max - A.freno_max; if (Math.abs(dG) >= 0.12) r.push(`frena más ${dG < 0 ? "suave" : "fuerte"} (${B.freno_max.toFixed(2)} g contra ${A.freno_max.toFixed(2)} g)`);
-      if (A.s_acel != null && B.s_acel != null) { const dA = B.s_acel - A.s_acel; if (Math.abs(dA) >= 4) r.push(`acelera ${f0(dA)} m ${dA < 0 ? "antes" : "más tarde"}`); }
-      const dL = B.off_apex - A.off_apex; if (Math.abs(dL) >= 0.6) r.push(`la línea en el vértice está corrida ${f1(dL)} m`);
+      { const dA = posDiff(a, b, "s_acel", 4); if (dA) r.push(`acelera ${f0(dA)} m ${dA < 0 ? "antes" : "más tarde"}`); }
+      const dL = posDiff(a, b, "off_apex", 0.6); if (dL) r.push(`la línea en el vértice está corrida ${f1(dL)} m`);
       return r;
     }
     function advice(a, b) {
       const A = a.t3, B = b.t3, t = [];
-      if (B.s_vmin - A.s_vmin <= -4) t.push(`esperar el vértice hasta cerca del metro ${f0(A.s_vmin)}`);
+      if (posDiff(a, b, "s_vmin", 4) < 0) t.push(`esperar el vértice hasta cerca del metro ${f0(A.s_vmin)}`);
       if (B.freno_max - A.freno_max <= -0.12) t.push(`frenar más fuerte y más corto (la otra llega a ${A.freno_max.toFixed(2)} g)`);
-      if (A.s_acel != null && B.s_acel != null && B.s_acel - A.s_acel >= 4) t.push(`acelerar antes, cerca del metro ${f0(A.s_acel)}`);
-      if (Math.abs(B.off_apex - A.off_apex) >= 0.6) t.push(`repetir la línea de la ${BT(REF)}`);
+      if (posDiff(a, b, "s_acel", 4) > 0) t.push(`acelerar antes, cerca del metro ${f0(A.s_acel)}`);
+      if (posDiff(a, b, "off_apex", 0.6)) t.push(`repetir la línea de la ${BT(REF)}`);
       if (!t.length && B.v_salida - A.v_salida <= -0.8) t.push("priorizar la salida, aunque se pierda algo de velocidad en el vértice");
       return t;
     }
@@ -275,10 +282,10 @@
       const tipFor = (p) => {
         if (p.k == "agarre") return "El kart agarró menos: revisá gomas o setup (no es manejo).";
         const A = p.a.t3, B = p.b.t3, t = [];
-        if (B.s_vmin - A.s_vmin <= -4) t.push("girá más tarde: esperá el vértice");
+        if (posDiff(p.a, p.b, "s_vmin", 4) < 0) t.push("girá más tarde: esperá el vértice");
         if (B.freno_max - A.freno_max <= -0.12) t.push("frená más fuerte y más corto");
-        if (A.s_acel != null && B.s_acel != null && B.s_acel - A.s_acel >= 4) t.push("volvé a acelerar antes");
-        if (Math.abs(B.off_apex - A.off_apex) >= 0.6) t.push(`repetí la línea de la ${BT(REF)}`);
+        if (posDiff(p.a, p.b, "s_acel", 4) > 0) t.push("volvé a acelerar antes");
+        if (posDiff(p.a, p.b, "off_apex", 0.6)) t.push(`repetí la línea de la ${BT(REF)}`);
         if (!t.length && B.v_salida - A.v_salida <= -0.8) t.push("priorizá la salida");
         if (!t.length) {
           const prev = C.find(c => c.n == p.n - 1);
@@ -388,7 +395,7 @@
               <div class="f">vmín ${b.t3.v_min.toFixed(1)} vs ${R0.t3.v_min.toFixed(1)} · vértice ${b.t3.s_vmin.toFixed(0)} vs ${R0.t3.s_vmin.toFixed(0)} m · salida ${b.t3.v_salida.toFixed(1)} vs ${R0.t3.v_salida.toFixed(1)} · G máx ${b.lat_ses_max.toFixed(2)} vs ${R0.lat_ses_max.toFixed(2)}</div>`;
             }).join("") + `</div>`;
         }).join("")}</div></div>
-      <div class="panel"><h2>Tabla completa</h2><p class="ink2">Promedio de las mejores vueltas. Línea: desvío de la trayectoria en el vértice respecto de la referencia (m).</p><div class="tw"><table class="tbl"></table></div></div>
+      <div class="panel"><h2>Tabla completa</h2><p class="ink2">Tiempos y velocidades: promedio de las mejores vueltas. Vértice, frenada, aceleración y línea: mediana de todas las vueltas rápidas, sin valores raros (varían vuelta a vuelta). Línea: desvío de la trayectoria en el vértice respecto de la referencia (m).</p><div class="tw"><table class="tbl"></table></div></div>
       <p class="note">Criterio automático: si la tanda más lenta nunca llegó al 94% de la G máxima de la referencia en esa curva, la pérdida se marca como agarre; entre 94% y 98%, zona gris (mixto); por encima, manejo. Es una primera lectura: no sabe de cambios de setup, gomas ni hora del día.</p>`;
     (() => {
       const svg = P(1).querySelector(".gmax"), PL = 50, PB = 30, PT = 12, H = 300, W = 800;

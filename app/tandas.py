@@ -45,6 +45,23 @@ def lateral_offset_fn(ref):
     return f
 
 
+POS_KEYS = ["s_vmin", "off_apex", "s_freno", "s_acel"]
+
+
+def robust_pos(x):
+    """Mediana sin valores raros (rango intercuartil) y su desvio; las posiciones varian vuelta a vuelta
+    y un promedio de pocas vueltas se lo lleva una sola vuelta rara."""
+    v = np.asarray(x, float)
+    v = v[np.isfinite(v)]
+    if not len(v):
+        return None, 0.0, 0
+    if len(v) >= 4:
+        q1, q3 = np.percentile(v, [25, 75])
+        iqr = max(q3 - q1, 1.0)
+        v = v[(v >= q1 - 1.5 * iqr) & (v <= q3 + 1.5 * iqr)]
+    return float(np.median(v)), float(v.std(ddof=1)) if len(v) > 1 else 0.0, int(len(v))
+
+
 def diagnose(A, B):
     """Clasifica la perdida de B contra A en una curva: agarre si B nunca llego a la G de A."""
     d = B["t3"]["tiempo"] - A["t3"]["tiempo"]
@@ -206,12 +223,16 @@ def build_data(paths, top=3, bands=None, log=print):
             for c in corners:
                 seg = d[(d.s >= c["s_start"]) & (d.s <= c["s_end"])]
                 apx = seg[(seg.s >= c["s_apex"] - 30) & (seg.s <= c["s_apex"] + 30)]
-                ia = apx.speed.idxmin()
+                # vertice = centro del "fondo" de velocidad (hasta 0.5 km/h sobre el minimo): el minimo exacto
+                # cae en cualquier punto de un fondo casi plano y se mueve varios metros por ruido
+                vm = apx.speed.min()
+                s_ap = float(apx.s[apx.speed <= vm + 0.5].mean())
+                ia = (apx.s - s_ap).abs().idxmin()
                 lg = seg.long.rolling(5, center=True, min_periods=1).median()
                 brk = seg[(lg < -0.3) & (seg.s < d.s[ia])]
                 gas = seg[(lg > 0.15) & (seg.s > d.s[ia])]
                 rows.append(dict(ses=sid, lap=int(lap.num), top=lap.num in best_laps.num.values, curva=c["n"],
-                                 tiempo=seg.t.iloc[-1] - seg.t.iloc[0], v_min=d.speed[ia], s_vmin=d.s[ia],
+                                 tiempo=seg.t.iloc[-1] - seg.t.iloc[0], v_min=vm, s_vmin=s_ap,
                                  v_salida=seg.speed.iloc[-1], lat_max=seg.latg_s.max(),
                                  freno_max=-seg.long.rolling(5, center=True, min_periods=1).median().min(),
                                  off_apex=d.off[ia],
@@ -241,8 +262,13 @@ def build_data(paths, top=3, bands=None, log=print):
         for sid in S:
             q = R[(R.ses == sid) & (R.curva == c["n"])]
             t = q[q.top]
-            by[sid] = dict(t3={k: round(float(t[k].mean()), 3) for k in ["tiempo", "v_min", "s_vmin", "v_salida", "lat_max", "freno_max", "off_apex", "s_freno", "s_acel"]},
-                           lat_ses_max=round(float(q.lat_max.max()), 2), best_sector=round(float(q.tiempo.min()), 3))
+            t3 = {k: round(float(t[k].mean()), 3) for k in ["tiempo", "v_min", "v_salida", "lat_max", "freno_max"]}
+            pos = {}
+            for k in POS_KEYS:          # posiciones: mediana de todas las vueltas rapidas, sin valores raros
+                m, sd, n = robust_pos(q[k])
+                t3[k] = round(m, 2) if m is not None else None
+                pos[k] = [round(sd, 2), n] if m is not None else None
+            by[sid] = dict(t3=t3, pos=pos, lat_ses_max=round(float(q.lat_max.max()), 2), best_sector=round(float(q.tiempo.min()), 3))
         diag = {sid: diagnose(by[ref_id], by[sid]) for sid in S if sid != ref_id}
         out["corners"].append(dict(n=c["n"], s0=c["s_start"], sa=c["s_apex"], s1=c["s_end"], by=by,
                                    diag={k: [v[0], round(v[1], 3)] for k, v in diag.items()}))
