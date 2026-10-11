@@ -170,11 +170,114 @@
       return `<div class="tw"><table><thead><tr><th>${xs.length > 1 ? `<span class="dot" style="--c:${COL[id]}"></span>${BT(id)} · ` : ""}Recta antes de</th><th>Largo</th><th>Vel. máx</th><th>RPM antes que vel.</th><th>Desvío</th><th>Pasadas</th></tr></thead><tbody>${
         c.rectas.map(r => `<tr><td>Curva ${r.curva}</td><td>${r.largo} m</td><td>${r.kmh.toFixed(0)} km/h</td><td><b>${sgn(r.delta, 1) || "0"} m</b></td><td>±${r.desvio.toFixed(1)} m</td><td>${r.n}${r.descartadas ? ` <span class="muted">(+${r.descartadas} descartadas)</span>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
     }).join("");
+    const semaf = carbVotos(ctx);
     return `<div class="panel carbp"><h2>Carburación</h2>
-      <p class="ink2">En cada recta: dónde llega el pico de RPM comparado con el pico de velocidad. Si el de RPM llega más de ${U} m antes, está gordo; si llega más de ${U} m después, fino.</p>
+      <p class="ink2">Tres indicios, sin sensor de escape. Ninguno es absoluto: si dos coinciden, la señal es firme. Confirmalo mirando la bujía y la cabeza del pistón.</p>
+      ${semaf}
+      <h3 class="carb-h">1 · Pico de RPM contra pico de velocidad</h3>
+      <p class="ink2 small">En cada recta: si el pico de RPM llega más de ${U} m antes que el de velocidad, está gordo; si llega más de ${U} m después, fino.</p>
       ${svg}<ul class="why compact carb-l">${lines}</ul>${diff}
       <details class="fold subtle"><summary><span class="small">Detalle por recta y cómo se mide</span></summary><div class="fold-body">${det}
-        <p class="note">Se mide en todas las pasadas por cada recta de más de 80 m, solo en la última marcha (un cambio a mitad de recta o la rebajada al frenar dan picos falsos). Los valores fuera de lo normal se descartan (rango intercuartil) y se promedia. Positivo = el pico de RPM llega antes. El ± es el margen del promedio (95%). En marcha fija las RPM y la velocidad van atadas, así que las diferencias suelen ser de pocos metros: comparar tandas con el mismo motor es lo más útil.</p></div></details></div>`;
+        <p class="note">Se mide en todas las pasadas por cada recta de más de 80 m, solo en la última marcha (un cambio a mitad de recta o la rebajada al frenar dan picos falsos). Los valores fuera de lo normal se descartan (rango intercuartil) y se promedia. Positivo = el pico de RPM llega antes. El ± es el margen del promedio (95%). En marcha fija las RPM y la velocidad van atadas, así que las diferencias suelen ser de pocos metros: comparar tandas con el mismo motor es lo más útil.</p></div></details>
+      <h3 class="carb-h">2 · Cómo estira arriba</h3>${estiraBlock(ctx)}
+      <h3 class="carb-h">3 · Clima, chicler y temperatura</h3><div class="carb-clima">${climaBlock(ctx)}</div></div>`;
+  }
+
+  /* --- indicio 2: cuanto cae la potencia pasado el pico (gordo = no pasa de vueltas) --- */
+  const mismaRel = (M, a, b) => Math.abs(M.sessions[a].ratio_top - M.sessions[b].ratio_top) / M.sessions[a].ratio_top < 0.015;
+  // con ritmo muy distinto (pista mojada, gomas gastadas) las RPM de arriba no dicen nada del carburador
+  const ritmoParecido = (ctx, a, b) => Math.abs(ctx.S[a].top[0] / ctx.S[b].top[0] - 1) < 0.025;
+  const comparable = (ctx, a, b) => mismaRel(ctx.M, a, b) && ritmoParecido(ctx, a, b);
+  function estiraVoto(ctx, id) {
+    const { M, REF, IDS } = ctx, e = M.sessions[id].estira;
+    if (!e) return null;
+    const otros = IDS.filter(x => x != id && M.sessions[x].estira && comparable(ctx, x, id));
+    // no llega a estirar: tope de RPM muy por debajo del de las otras tandas con la misma relacion
+    const topes = otros.map(x => M.sessions[x].estira.rpm_max);
+    if (topes.length && e.rpm_max < Math.min(...topes) - 700) return { v: "rico", txt: `no pasa de ${(e.rpm_max / 1000).toFixed(1)}k rpm (las otras llegan a ${(Math.min(...topes) / 1000).toFixed(1)}k)` };
+    if (id == REF || e.caida == null) return null;
+    const r = M.sessions[REF].estira;
+    if (!r || r.caida == null || !comparable(ctx, REF, id)) return null;
+    const d = (e.caida - r.caida) * 100, m = 2 * Math.hypot(e.sd || 0.03, r.sd || 0.03) * 100;
+    if (Math.abs(d) < Math.max(4, m)) return { v: "ok", txt: "estira igual que la referencia" };
+    return { v: d > 0 ? "rico" : "pobre", txt: `estira ${d > 0 ? "menos" : "más"} que la ${ctx.BT(REF)} (${f0(d)} puntos)` };
+  }
+  function estiraBlock(ctx) {
+    const { IDS, M, COL, BT, REF } = ctx, xs = IDS.filter(id => M.sessions[id].estira);
+    if (!xs.length) return `<p class="small ink2">No hay suficientes datos acelerando arriba para medirlo.</p>`;
+    const li = xs.map(id => {
+      const e = M.sessions[id].estira, v = estiraVoto(ctx, id);
+      const base = e.caida == null ? `pico de potencia a ${(e.pico / 1000).toFixed(1)}k; no hay datos ${e.dr} rpm más arriba (llega hasta ${(e.rpm_max / 1000).toFixed(1)}k)`
+        : `pico de potencia a ${(e.pico / 1000).toFixed(1)}k; ${e.dr} rpm más arriba cae <b>${(e.caida * 100).toFixed(0)}%</b>${e.sd ? ` <span class="muted small">(±${(e.sd * 200).toFixed(0)})</span>` : ""}`;
+      return `<li>${xs.length > 1 ? `<span class="dot" style="--c:${COL[id]}"></span><b>${BT(id)}</b> · ` : ""}${base}${v && v.v != "ok" ? `<br><span class="chip bad">${v.v == "rico" ? "Más gorda" : "Más fina"}</span> <span class="small">${v.txt}</span>` : v ? `<br><span class="small ink2">${v.txt}</span>` : ""}</li>`;
+    }).join("");
+    const rel = xs.length < 2 ? "" : xs.some(id => !mismaRel(M, REF, id)) ? `<p class="small b">Hay tandas con otra relación de transmisión: el estiramiento no se compara entre ellas.</p>`
+      : xs.some(id => !ritmoParecido(ctx, REF, id)) ? `<p class="small b">Hay tandas con un ritmo muy distinto (¿pista mojada?): el estiramiento no se compara entre ellas.</p>` : "";
+    return `<p class="ink2 small">Un motor gordo "no pasa de vueltas": pasado el pico, la potencia se cae rápido. Uno fino estira más. Se compara entre tandas con la misma relación; con pocas vueltas es ruidoso, por eso solo se marcan diferencias grandes.</p><ul class="why compact carb-l">${li}</ul>${rel}`;
+  }
+
+  /* --- indicio 3: clima. Un carburador empobrece con aire mas denso: el chicler va con la raiz cuarta de la
+     densidad del aire seco (el vapor de agua no aporta oxigeno) --- */
+  const rhoSeco = c => { const es = 6.1078 * Math.pow(10, 7.5 * c.T / (c.T + 237.3)), pv = c.RH / 100 * es; return (c.P - pv) * 100 / (287.05 * (c.T + 273.15)); };
+  const chiclerDe = s => { const t = String(((s.setup || {}).valores || {}).carburacion || ""); const m = t.match(/CHICLER\D{0,4}(\d{2,3})/i) || t.match(/\b(1\d\d|2[0-4]\d)\b/); return m ? +m[1] : null; };
+  const carbRefKey = s => "kt-carbref-" + (s.kart || "kart").toUpperCase();
+  const aguaDe = (ctx, id) => { const s = ctx.S[id], w = s.laps.filter(l => s.top.includes(l.t) && l.agua != null).map(l => l.agua); return w.length ? avg(w) : null; };
+  function climaVoto(ctx, id) {
+    const s = ctx.S[id], c = (ctx.D.clima || {})[id], ref = store.get(carbRefKey(s), null);
+    if (!c || !ref) return null;
+    const ratio = rhoSeco(c) / ref.rho, sug = ref.chicler * Math.pow(ratio, 0.25), uso = chiclerDe(s) || ref.chicler, d = uso - sug;
+    return { ratio, sug, uso, propio: !!chiclerDe(s), d, v: d > 1.5 ? "rico" : d < -1.5 ? "pobre" : "ok", ref };
+  }
+  function climaBlock(ctx) {
+    const { IDS, S, COL, BT, D } = ctx, any = IDS.find(id => (D.clima || {})[id]);
+    if (!any) return `<p class="small ink2">Sin datos de clima (hace falta internet la primera vez que se abre la tanda).</p>`;
+    const ref = store.get(carbRefKey(S[any]), null);
+    const li = IDS.filter(id => (D.clima || {})[id]).map(id => {
+      const c = D.clima[id], v = climaVoto(ctx, id), ag = aguaDe(ctx, id), cj = chiclerDe(S[id]);
+      let t = `${c.T.toFixed(0)} °C · ${c.RH.toFixed(0)}% hum · ${c.P.toFixed(0)} hPa${ag != null ? ` · agua ${ag.toFixed(0)} °C` : ""}${cj ? ` · chicler ${cj}` : ""}`;
+      if (v) {
+        const dens = (v.ratio - 1) * 100;
+        t += `<br>Aire ${f1(dens)}% ${dens >= 0 ? "más denso" : "más liviano"} que el día de referencia: chicler sugerido <b>${v.sug.toFixed(0)}</b>`;
+        t += v.v == "ok" ? ` <span class="chip good">En punto</span>` : ` <span class="chip bad">${v.v == "rico" ? "Gordo" : "Fino"}</span> <span class="small">${v.propio ? `con el ${v.uso}` : `si usaste el ${v.uso}`} estás ${f1(v.d)} números ${v.v == "rico" ? "gordo" : "fino"}</span>`;
+        if (ag != null && v.ref.agua != null && Math.abs(ag - v.ref.agua) >= 5)
+          t += `<br><span class="small ink2">El agua estuvo ${f0(ag - v.ref.agua)} °C ${ag > v.ref.agua ? "más caliente: el motor tiende a afinar (quema más completo y sube el riesgo de detonación)" : "más fría: el motor tiende a engordar"}.</span>`;
+      }
+      return `<li>${IDS.length > 1 ? `<span class="dot" style="--c:${COL[id]}"></span><b>${BT(id)}</b> · ` : ""}${t}
+        <div class="carb-ref"><label class="small ink2">Chicler <input type="number" min="80" max="260" step="1" value="${cj || (ref ? ref.chicler : "")}" data-id="${esc(id)}"></label><button class="btn small" data-ref="${esc(id)}">Esta tanda tuvo buena carburación</button></div></li>`;
+    }).join("");
+    const head = ref ? `<p class="small">Referencia: tanda ${esc(ref.tanda)} del ${esc(ref.fecha)}, chicler <b>${ref.chicler}</b>${ref.agua != null ? `, agua ${ref.agua.toFixed(0)} °C` : ""}. <button class="btn small" data-borrar="1">Quitar referencia</button></p>`
+      : `<p class="small">Marcá una tanda en la que la carburación anduvo bien y su chicler: con el clima de cada día te sugiero el chicler para las demás.</p>`;
+    return `<p class="ink2 small">Con el mismo chicler, el carburador empobrece cuando el aire está más denso (frío, presión alta, seco) y engorda cuando está más liviano. El chicler necesario va con la raíz cuarta de la densidad del aire seco: 4% más de densidad ≈ 1% más de chicler (165 → 167).</p>${head}<ul class="why compact carb-l">${li}</ul>`;
+  }
+  function wireCarb(ctx, root) {
+    const box = root.querySelector(".carb-clima"); if (!box) return;
+    box.addEventListener("click", e => {
+      const b = e.target.closest("button"); if (!b) return;
+      const s0 = ctx.S[ctx.IDS[0]];
+      if (b.dataset.borrar) { try { localStorage.removeItem(carbRefKey(s0)); } catch (x) { } }
+      if (b.dataset.ref) {
+        const id = b.dataset.ref, s = ctx.S[id], c = (ctx.D.clima || {})[id], inp = box.querySelector(`input[data-id="${CSS.escape(id)}"]`), ch = +inp.value;
+        if (!c) return;
+        if (!(ch >= 80 && ch <= 260)) { inp.focus(); return; }
+        store.set(carbRefKey(s), { chicler: ch, rho: rhoSeco(c), agua: aguaDe(ctx, id), fecha: s.date && s.date.length == 10 ? `${s.date.slice(3, 5)}/${s.date.slice(0, 2)}/${s.date.slice(6)}` : s.date, tanda: ctx.BT(id) });
+      }
+      box.innerHTML = climaBlock(ctx);
+      const sem = root.querySelector(".carb-sem"); if (sem) sem.outerHTML = carbVotos(ctx);
+    });
+  }
+  /* --- resumen: los tres indicios por tanda --- */
+  function carbVotos(ctx) {
+    const { IDS, M, COL, BT } = ctx;
+    const rows = IDS.map(id => {
+      const c = M.sessions[id].carburacion, e = estiraVoto(ctx, id), k = climaVoto(ctx, id);
+      const v = [c && !c.pocos ? c.estado : null, e ? e.v : null, k ? k.v : null];
+      const chip = (x, n) => x == null ? `<span class="chip">${n}: –</span>` : `<span class="chip ${x == "ok" ? "good" : "bad"}">${n}: ${x == "ok" ? "en punto" : x == "rico" ? "gordo" : "fino"}</span>`;
+      const g = v.filter(x => x == "rico").length, f = v.filter(x => x == "pobre").length, n = v.filter(x => x != null).length, o = v.filter(x => x == "ok").length;
+      const one = v.find(x => x != null), lbl = x => x == "ok" ? "en punto" : x == "rico" ? "gorda" : "fina";
+      const res = g >= 2 ? `<b>Gorda</b>: coinciden ${g} indicios` : f >= 2 ? `<b>Fina</b>: coinciden ${f} indicios` : o >= 2 ? "<b>En punto</b>" : n == 1 ? `Un solo indicio: ${lbl(one)}` : n ? "Los indicios no coinciden" : "Sin datos";
+      return `<li>${IDS.length > 1 ? `<span class="dot" style="--c:${COL[id]}"></span><b>${BT(id)}</b> · ` : ""}${res}<br>${chip(v[0], "Picos")} ${chip(v[1], "Estira")} ${chip(v[2], "Clima")}</li>`;
+    }).join("");
+    return `<ul class="why compact carb-sem">${rows}</ul>`;
   }
 
   function powerPanel(ctx) {
@@ -575,5 +678,5 @@
     root.querySelector(".csim").innerHTML = others.length ? `<div class="tw"><table><thead><tr><th>Circuito</th><th>Parecido</th><th>Largo</th><th>V media</th><th>Curvas</th><th>Agarre</th></tr></thead><tbody>${others.map(o => `<tr title="${esc(o.resumen)}"><td>${esc(o.nombre || "–")}</td><td class="${o.sim >= 75 ? "g" : ""}">${o.sim}%</td><td>${o.largo} m</td><td>${o.v_media} km/h</td><td>${o.curvas}</td><td>${o.grip} g</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted small">Todavía no hay otros circuitos guardados. Cuando analices tandas de otra pista, aparece acá cuánto se parece a ${esc(c.nombre || "esta")}.</p>`;
   }
 
-  window.KTX = { circuitPane, wireCircuit, circuitSummary, audioSpectrum, spectralSync, setupDiff, setupChips, setupModal, climaTxt, optimoPane, simpleOptimo, optimoTips, lapTrend, powerPanel, drawPower, hpDelta, carbPanel, carbSimple, transPane, wireTrans, sensorsPane, drawWater, videoPane, wireVideo, store };
+  window.KTX = { circuitPane, wireCircuit, circuitSummary, audioSpectrum, spectralSync, setupDiff, setupChips, setupModal, climaTxt, optimoPane, simpleOptimo, optimoTips, lapTrend, powerPanel, drawPower, hpDelta, carbPanel, carbSimple, wireCarb, transPane, wireTrans, sensorsPane, drawWater, videoPane, wireVideo, store };
 })();

@@ -360,3 +360,8 @@ p.help{font-size:13px;color:var(--ink2);margin:4px 0 8px;max-width:85ch}
 .carbp svg.carb{width:100%;max-width:680px;height:auto;display:block;margin:6px 0 4px}
 .carb-l li{line-height:1.6}
 @media (max-width:640px){.carbp svg.carb text{font-size:24px}}
+.carbp h3.carb-h{font-size:15px;margin:18px 0 4px;padding-top:12px;border-top:1px solid var(--line)}
+.carb-sem{margin:8px 0 4px}.carb-sem .chip{margin:4px 4px 0 0}
+.carb-ref{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.carb-ref input{width:72px}
+.btn.small{padding:4px 10px;font-size:12px;width:auto}

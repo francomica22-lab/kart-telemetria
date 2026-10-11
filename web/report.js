@@ -508,6 +508,7 @@
       </div>
       <p class="note">Cómo probar un cambio de motor, escape o carburación: dos tandas seguidas, mismo horario, mismas gomas y misma relación. Mirá primero el dinamómetro en 2da: es la medida más estable. Una diferencia "dentro del ruido" significa que con estos datos no se puede afirmar que haya cambio.</p>`;
     KTX.drawPower(ctx, P(2));
+    KTX.wireCarb(ctx, P(2));
     // tabla bandas por salida
     (() => {
       const rows = {};

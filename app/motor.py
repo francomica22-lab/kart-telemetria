@@ -294,6 +294,42 @@ def _carburacion(d, corners, ref_len, min_len=80):
                 pocos=bool(w.sum() < 6))
 
 
+def _caida(bins, dr=750, m=175.0, cda=0.55, crr=0.025, rho=1.2):
+    """Cuanto cae la potencia desde el pico hasta dr rpm mas arriba (0.08 = 8%). None si no llega a esas RPM."""
+    c = [(b["rpm"], (m * b["acc"] * G + 0.5 * rho * cda * b["v"] ** 2 + crr * m * G) * b["v"] / 745.7)
+         for b in bins if b["n"] >= 25 and b["vueltas"] >= 2]
+    if len(c) < 5:
+        return None, None, None
+    r = np.array([x[0] for x in c]); p = np.convolve([x[1] for x in c], np.ones(3) / 3, mode="same")
+    i = int(np.argmax(p[1:-1])) + 1
+    if r[i] + dr > r[-1]:
+        return float(r[i]), None, float(r[-1])
+    return float(r[i]), float(1 - np.interp(r[i] + dr, r, p) / p[i]), float(r[-1])
+
+
+def _estira(d, n_boot=40, seed=1):
+    """Como estira el motor pasado el pico de potencia. Un motor gordo 'no pasa de vueltas': la potencia cae rapido
+    despues del pico. El margen sale de remuestrear vueltas (bootstrap), porque con pocas vueltas es ruidoso."""
+    pico, caida, rmax = _caida(_power_bins(d))
+    if pico is None:
+        return None
+    out = dict(pico=round(pico), rpm_max=round(rmax), dr=750, caida=None, sd=None)
+    if caida is None:
+        return out
+    laps = d.lap.unique()
+    rng = np.random.default_rng(seed)
+    vals = []
+    groups = {k: g for k, g in d.groupby("lap")}
+    for _ in range(n_boot):
+        pick = rng.choice(laps, len(laps), replace=True)
+        x = pd.concat([groups[k].assign(lap=i) for i, k in enumerate(pick)], ignore_index=True)
+        _, c, _ = _caida(_power_bins(x))
+        if c is not None:
+            vals.append(c)
+    out.update(caida=round(caida, 4), sd=round(float(np.std(vals, ddof=1)), 4) if len(vals) >= 10 else None)
+    return out
+
+
 def _shifts(d):
     out = []
     for lap, q in d.groupby("lap"):
@@ -324,6 +360,7 @@ def analyze(S, laps_by_ses, ref_id, ref_len, corners, bands=None):
             potencia=_power_bins(d), transmision=_transmision(d, corners, gears), n_vueltas=int(d.lap.nunique()),
             fallas=_fallas(d, corners),
             carburacion=_carburacion(d, corners, ref_len),
+            estira=_estira(d),
             bands={k: (dict(n=len(e), median=float(e.dur.median()), p25=float(e.dur.quantile(.25)), p75=float(e.dur.quantile(.75)),
                             by_gear={int(g): dict(n=len(x), median=float(x.dur.median())) for g, x in e.groupby("gear")})
                        if len(e) else dict(n=0)) for k, e in ev.items()},
