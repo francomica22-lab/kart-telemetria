@@ -79,7 +79,7 @@
     const P = i => root.querySelector(`.pane[data-p="${i}"]`);
     const eb = root.querySelector(".expbtn"); if (eb) eb.addEventListener("click", () => opts.onExport());
     const sb = root.querySelector(".shbtn"); if (sb) sb.addEventListener("click", () => opts.onShare());
-    const ctx = { D, IDS, S, COL, NAME, M, REF, BT };
+    const ctx = { D, IDS, S, COL, NAME, M, REF, BT, saveSetup: opts.saveSetup };
     root.querySelectorAll(".kartbtn").forEach(b => b.addEventListener("click", () => KTK.modal(b.dataset.k, () => { window.renderReport(D, root, opts); opts.onKartChange && opts.onKartChange(); })));
     root.querySelectorAll(".setbtn").forEach(b => b.addEventListener("click", () => {
       const s = S[b.dataset.id];

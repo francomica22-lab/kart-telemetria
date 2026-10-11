@@ -365,3 +365,13 @@ p.help{font-size:13px;color:var(--ink2);margin:4px 0 8px;max-width:85ch}
 .carb-ref{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
 .carb-ref input{width:72px}
 .btn.small{padding:4px 10px;font-size:12px;width:auto}
+.carb-sug{margin:6px 0 2px;padding:8px 10px;border-left:2px solid var(--line);background:var(--panel2);border-radius:4px}
+.carb-sug p{margin:2px 0}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg label{cursor:pointer}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg span{display:inline-block;padding:6px 10px;border:1px solid var(--line);border-radius:4px;font-size:13px;color:var(--ink2)}
+.seg input:checked+span{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.seg input:focus-visible+span{outline:2px solid var(--ink);outline-offset:2px}
+.cm-row{display:grid;gap:6px;margin:10px 0}
+.cm-row>span{font-size:13px;color:var(--ink2)}

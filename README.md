@@ -15,7 +15,7 @@ Compará tandas de la **AiM MyChron** (archivos `.xrk`) curva por curva: cuánto
 - **Motor**: curva de potencia estimada en HP (todas las vueltas), comparación con margen de error y corrección por clima.
 - **Clima automático** (Open-Meteo) por ubicación GPS y hora de la tanda.
 - **Setup**: se lee del comentario de la MyChron y se puede editar (se guarda junto al `.xrk`).
-- **Carburación**: tres indicios sin sensor de escape: pico de RPM contra pico de velocidad en recta, cuánto estira el motor pasado el pico de potencia, y chicler sugerido según el clima a partir de una tanda de referencia (con la temperatura de agua como dato).
+- **Carburación**: tres indicios sin sensor de escape (pico de RPM contra pico de velocidad, cuánto sube el motor cerca del tope, y clima contra una tanda de referencia), cruzados con lo que sentiste (gordo, fino, detonación) para sugerir el cambio: chicler y aguja en carburadores a cortina, vueltas de baja y alta en los de membrana.
 - **Transmisión**: sugiere la corona según las RPM al final de la recta.
 - **Sensores**: agua, escape, batería y lo que haya registrado la MyChron.
 - **Video**: sincroniza el onboard con la telemetría escuchando el motor; dos videos se mueven juntos por posición en pista.

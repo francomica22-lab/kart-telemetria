@@ -34,7 +34,7 @@
     return items.join("");
   }
   function setupModal(D, s, onSave) {
-    const V = Object.assign({}, (s.setup || {}).valores || {}), auto = (s.setup || {}).auto || {}, F = D.setup_fields || [];
+    const V = Object.assign({}, (s.setup || {}).valores || {}), auto = (s.setup || {}).auto || {}, F = (D.setup_fields || []).filter(f => !CARB_KEYS.includes(f[0]));
     const d = document.createElement("div"); d.className = "modal";
     d.innerHTML = `<form class="mbox wide" role="dialog" aria-modal="true" aria-labelledby="st"><h2 id="st">Setup · ${esc(s.top[0].toFixed(3))} · ${esc(s.hour)}</h2>
       <p class="ink2 small">Lo que viene del comentario de la MyChron ya está completo. Lo que cargues acá se guarda junto al archivo de la tanda.</p>
@@ -48,6 +48,7 @@
       e.preventDefault();
       const vals = {};
       for (const f of F) { let v = d.querySelector("#sf-" + f[0]).value.trim(); if (v === "") continue; const n = Number(v.replace(",", ".")); vals[f[0]] = f[2] && !isNaN(n) ? n : v; }
+      const man = (s.setup || {}).manual || {}; for (const k of CARB_KEYS) if (man[k] != null && man[k] !== "") vals[k] = man[k];
       const r = await onSave(vals);
       if (r && r.error) { d.querySelector("#smsg").textContent = r.error; d.querySelector("#smsg").className = "small b"; return; }
       d.remove();
@@ -124,6 +125,7 @@
     return { m: peso, cda: st.cda || 0.55, crr: st.crr || 0.025, rho: c ? c.rho : 1.2 };
   }
   /* ---------- carburacion: pico de RPM contra pico de velocidad en recta ---------- */
+  const CARB_KEYS = ["carb_tipo", "chicler", "aguja", "baja", "alta", "sensacion", "sensacion_donde", "detonacion"];
   const CARB = { rico: ["Gordo (rico)", "bad"], pobre: ["Fino (pobre)", "bad"], ok: ["En punto", "good"] };
   const carbDonde = c => Math.abs(c.delta) < 0.5 ? "en el mismo lugar que el de velocidad" : `${f1(c.delta)} m ${c.delta > 0 ? "antes" : "después"} que el de velocidad`;
   function carbSimple(ctx) {
@@ -174,6 +176,7 @@
     return `<div class="panel carbp"><h2>Carburación</h2>
       <p class="ink2">Tres indicios, sin sensor de escape. Ninguno es absoluto: si dos coinciden, la señal es firme. Confirmalo mirando la bujía y la cabeza del pistón.</p>
       ${semaf}
+      <h3 class="carb-h">Lo que sentiste y qué cambiar</h3>${sentiBlock(ctx)}
       <h3 class="carb-h">1 · Pico de RPM contra pico de velocidad</h3>
       <p class="ink2 small">En cada recta: si el pico de RPM llega más de ${U} m antes que el de velocidad, está gordo; si llega más de ${U} m después, fino.</p>
       ${svg}<ul class="why compact carb-l">${lines}</ul>${diff}
@@ -184,6 +187,8 @@
   }
 
   /* --- indicio 2: cuanto cae la potencia pasado el pico (gordo = no pasa de vueltas) --- */
+  const CARRERA_RE = /\b(PRE ?FINAL|FINAL|MANGA|CARRERA|HEAT|RACE)\b/i, NO_CARRERA = /WARM ?UP|PR[AÁ]CTICA|ENTRENA|TEST|LIBRE/i;
+  const CARRERA = { test: t => CARRERA_RE.test(t) && !NO_CARRERA.test(t) };
   const mismaRel = (M, a, b) => Math.abs(M.sessions[a].ratio_top - M.sessions[b].ratio_top) / M.sessions[a].ratio_top < 0.015;
   // con ritmo muy distinto (pista mojada, gomas gastadas) las RPM de arriba no dicen nada del carburador
   const ritmoParecido = (ctx, a, b) => Math.abs(ctx.S[a].top[0] / ctx.S[b].top[0] - 1) < 0.025;
@@ -195,9 +200,16 @@
     // no llega a estirar: tope de RPM muy por debajo del de las otras tandas con la misma relacion
     const topes = otros.map(x => M.sessions[x].estira.rpm_max);
     if (topes.length && e.rpm_max < Math.min(...topes) - 700) return { v: "rico", txt: `no pasa de ${(e.rpm_max / 1000).toFixed(1)}k rpm (las otras llegan a ${(Math.min(...topes) / 1000).toFixed(1)}k)` };
-    if (id == REF || e.caida == null) return null;
+    if (id == REF || !comparable(ctx, REF, id)) return null;
+    // subida de RPM cerca del tope (rpm/s, mediana por vuelta): mas rapido = estira mas = mas fino
+    const su = M.sessions[id].sube, sr = M.sessions[REF].sube;
+    if (su && sr && sr.med > 0) {
+      const d = su.med / sr.med - 1, m = 2 * Math.hypot(su.se, sr.se) / sr.med;
+      if (Math.abs(d) < Math.max(0.12, m)) return { v: "ok", txt: `cerca del tope sube igual que la ${ctx.BT(REF)}` };
+      return { v: d > 0 ? "pobre" : "rico", txt: `cerca del tope sube ${f0(d * 100)}% ${d > 0 ? "más rápido" : "más lento"} que la ${ctx.BT(REF)}` };
+    }
     const r = M.sessions[REF].estira;
-    if (!r || r.caida == null || !comparable(ctx, REF, id)) return null;
+    if (e.caida == null || !r || r.caida == null) return null;
     const d = (e.caida - r.caida) * 100, m = 2 * Math.hypot(e.sd || 0.03, r.sd || 0.03) * 100;
     if (Math.abs(d) < Math.max(4, m)) return { v: "ok", txt: "estira igual que la referencia" };
     return { v: d > 0 ? "rico" : "pobre", txt: `estira ${d > 0 ? "menos" : "más"} que la ${ctx.BT(REF)} (${f0(d)} puntos)` };
@@ -207,25 +219,33 @@
     if (!xs.length) return `<p class="small ink2">No hay suficientes datos acelerando arriba para medirlo.</p>`;
     const li = xs.map(id => {
       const e = M.sessions[id].estira, v = estiraVoto(ctx, id);
-      const base = e.caida == null ? `pico de potencia a ${(e.pico / 1000).toFixed(1)}k; no hay datos ${e.dr} rpm más arriba (llega hasta ${(e.rpm_max / 1000).toFixed(1)}k)`
-        : `pico de potencia a ${(e.pico / 1000).toFixed(1)}k; ${e.dr} rpm más arriba cae <b>${(e.caida * 100).toFixed(0)}%</b>${e.sd ? ` <span class="muted small">(±${(e.sd * 200).toFixed(0)})</span>` : ""}`;
+      const su = M.sessions[id].sube;
+      const base = (su ? `entre ${(su.banda[0] / 1000).toFixed(1)}k y ${(su.banda[1] / 1000).toFixed(1)}k sube <b>${su.med} rpm/s</b> <span class="muted small">(±${2 * su.se} · ${su.n} vueltas)</span> · ` : "") +
+        (e.caida == null ? `pico de potencia a ${(e.pico / 1000).toFixed(1)}k, llega hasta ${(e.rpm_max / 1000).toFixed(1)}k`
+          : `pico de potencia a ${(e.pico / 1000).toFixed(1)}k, ${e.dr} rpm más arriba cae ${(e.caida * 100).toFixed(0)}%`) +
+        (CARRERA.test(ctx.S[id].comment || "") ? `<br><span class="small ink2">Fue carrera: el rebufo también ayuda a estirar arriba.</span>` : "");
       return `<li>${xs.length > 1 ? `<span class="dot" style="--c:${COL[id]}"></span><b>${BT(id)}</b> · ` : ""}${base}${v && v.v != "ok" ? `<br><span class="chip bad">${v.v == "rico" ? "Más gorda" : "Más fina"}</span> <span class="small">${v.txt}</span>` : v ? `<br><span class="small ink2">${v.txt}</span>` : ""}</li>`;
     }).join("");
     const rel = xs.length < 2 ? "" : xs.some(id => !mismaRel(M, REF, id)) ? `<p class="small b">Hay tandas con otra relación de transmisión: el estiramiento no se compara entre ellas.</p>`
       : xs.some(id => !ritmoParecido(ctx, REF, id)) ? `<p class="small b">Hay tandas con un ritmo muy distinto (¿pista mojada?): el estiramiento no se compara entre ellas.</p>` : "";
-    return `<p class="ink2 small">Un motor gordo "no pasa de vueltas": pasado el pico, la potencia se cae rápido. Uno fino estira más. Se compara entre tandas con la misma relación; con pocas vueltas es ruidoso, por eso solo se marcan diferencias grandes.</p><ul class="why compact carb-l">${li}</ul>${rel}`;
+    return `<p class="ink2 small">Un motor gordo "no pasa de vueltas" y se planta arriba; uno fino estira más (y es el que detona). Se mide cuántas rpm por segundo sube cerca del tope, en la marcha larga y casi en recta, y se compara entre tandas con la misma relación y ritmo parecido.</p><ul class="why compact carb-l">${li}</ul>${rel}`;
   }
 
   /* --- indicio 3: clima. Un carburador empobrece con aire mas denso: el chicler va con la raiz cuarta de la
      densidad del aire seco (el vapor de agua no aporta oxigeno) --- */
   const rhoSeco = c => { const es = 6.1078 * Math.pow(10, 7.5 * c.T / (c.T + 237.3)), pv = c.RH / 100 * es; return (c.P - pv) * 100 / (287.05 * (c.T + 273.15)); };
-  const chiclerDe = s => { const t = String(((s.setup || {}).valores || {}).carburacion || ""); const m = t.match(/CHICLER\D{0,4}(\d{2,3})/i) || t.match(/\b(1\d\d|2[0-4]\d)\b/); return m ? +m[1] : null; };
+  const chiclerDe = s => { const V = (s.setup || {}).valores || {}; if (+V.chicler) return +V.chicler; const t = String(V.carburacion || ""); const m = t.match(/CHICLER\D{0,4}(\d{2,3})/i) || t.match(/\b(1\d\d|2[0-4]\d)\b/); return m ? +m[1] : null; };
   const carbRefKey = s => "kt-carbref-" + (s.kart || "kart").toUpperCase();
   const aguaDe = (ctx, id) => { const s = ctx.S[id], w = s.laps.filter(l => s.top.includes(l.t) && l.agua != null).map(l => l.agua); return w.length ? avg(w) : null; };
   function climaVoto(ctx, id) {
     const s = ctx.S[id], c = (ctx.D.clima || {})[id], ref = store.get(carbRefKey(s), null);
     if (!c || !ref) return null;
-    const ratio = rhoSeco(c) / ref.rho, sug = ref.chicler * Math.pow(ratio, 0.25), uso = chiclerDe(s) || ref.chicler, d = uso - sug;
+    const ratio = rhoSeco(c) / ref.rho;
+    if (!ref.chicler) {   // membrana: sin formula de vueltas confiable, solo la direccion
+      const dd = ratio - 1;
+      return { ratio, membrana: true, d: 0, v: Math.abs(dd) < 0.03 ? "ok" : dd > 0 ? "pobre" : "rico", ref };
+    }
+    const sug = ref.chicler * Math.pow(ratio, 0.25), uso = chiclerDe(s) || ref.chicler, d = uso - sug;
     return { ratio, sug, uso, propio: !!chiclerDe(s), d, v: d > 1.5 ? "rico" : d < -1.5 ? "pobre" : "ok", ref };
   }
   function climaBlock(ctx) {
@@ -237,44 +257,179 @@
       let t = `${c.T.toFixed(0)} °C · ${c.RH.toFixed(0)}% hum · ${c.P.toFixed(0)} hPa${ag != null ? ` · agua ${ag.toFixed(0)} °C` : ""}${cj ? ` · chicler ${cj}` : ""}`;
       if (v) {
         const dens = (v.ratio - 1) * 100;
-        t += `<br>Aire ${f1(dens)}% ${dens >= 0 ? "más denso" : "más liviano"} que el día de referencia: chicler sugerido <b>${v.sug.toFixed(0)}</b>`;
-        t += v.v == "ok" ? ` <span class="chip good">En punto</span>` : ` <span class="chip bad">${v.v == "rico" ? "Gordo" : "Fino"}</span> <span class="small">${v.propio ? `con el ${v.uso}` : `si usaste el ${v.uso}`} estás ${f1(v.d)} números ${v.v == "rico" ? "gordo" : "fino"}</span>`;
+        if (v.membrana) {
+          t += `<br>Aire ${f1(dens)}% ${dens >= 0 ? "más denso" : "más liviano"} que el día de referencia` + (v.v == "ok" ? ` <span class="chip good">Mismo ajuste</span>`
+            : `: con las mismas vueltas queda más ${v.v == "rico" ? "gordo" : "fino"} <span class="chip bad">${v.v == "rico" ? "Cerrá" : "Abrí"} un poco la alta</span>`);
+        } else {
+          t += `<br>Aire ${f1(dens)}% ${dens >= 0 ? "más denso" : "más liviano"} que el día de referencia: chicler sugerido <b>${v.sug.toFixed(0)}</b>`;
+          t += v.v == "ok" ? ` <span class="chip good">En punto</span>` : ` <span class="chip bad">${v.v == "rico" ? "Gordo" : "Fino"}</span> <span class="small">${v.propio ? `con el ${v.uso}` : `si usaste el ${v.uso}`} estás ${f1(v.d)} números ${v.v == "rico" ? "gordo" : "fino"}</span>`;
+        }
         if (ag != null && v.ref.agua != null && Math.abs(ag - v.ref.agua) >= 5)
           t += `<br><span class="small ink2">El agua estuvo ${f0(ag - v.ref.agua)} °C ${ag > v.ref.agua ? "más caliente: el motor tiende a afinar (quema más completo y sube el riesgo de detonación)" : "más fría: el motor tiende a engordar"}.</span>`;
       }
-      return `<li>${IDS.length > 1 ? `<span class="dot" style="--c:${COL[id]}"></span><b>${BT(id)}</b> · ` : ""}${t}
-        <div class="carb-ref"><label class="small ink2">Chicler <input type="number" min="80" max="260" step="1" value="${cj || (ref ? ref.chicler : "")}" data-id="${esc(id)}"></label><button class="btn small" data-ref="${esc(id)}">Esta tanda tuvo buena carburación</button></div></li>`;
+      return `<li>${IDS.length > 1 ? `<span class="dot" style="--c:${COL[id]}"></span><b>${BT(id)}</b> · ` : ""}${t}</li>`;
     }).join("");
-    const head = ref ? `<p class="small">Referencia: tanda ${esc(ref.tanda)} del ${esc(ref.fecha)}, chicler <b>${ref.chicler}</b>${ref.agua != null ? `, agua ${ref.agua.toFixed(0)} °C` : ""}. <button class="btn small" data-borrar="1">Quitar referencia</button></p>`
-      : `<p class="small">Marcá una tanda en la que la carburación anduvo bien y su chicler: con el clima de cada día te sugiero el chicler para las demás.</p>`;
+    const head = ref ? `<p class="small">Referencia: tanda ${esc(ref.tanda)} del ${esc(ref.fecha)}, ${ref.chicler ? `chicler <b>${ref.chicler}</b>` : `baja ${esc(vueltasTxt(ref.baja))} · alta ${esc(vueltasTxt(ref.alta))}`}${ref.agua != null ? `, agua ${ref.agua.toFixed(0)} °C` : ""}. <button class="btn small" data-borrar="1">Quitar referencia</button></p>`
+      : `<p class="small">Cargá en "Lo que sentiste" una tanda que anduvo <b>en punto</b> con su chicler (o sus vueltas): pasa a ser la referencia y con el clima de cada día te digo cómo ajustar las demás.</p>`;
     return `<p class="ink2 small">Con el mismo chicler, el carburador empobrece cuando el aire está más denso (frío, presión alta, seco) y engorda cuando está más liviano. El chicler necesario va con la raíz cuarta de la densidad del aire seco: 4% más de densidad ≈ 1% más de chicler (165 → 167).</p>${head}<ul class="why compact carb-l">${li}</ul>`;
   }
   function wireCarb(ctx, root) {
-    const box = root.querySelector(".carb-clima"); if (!box) return;
-    box.addEventListener("click", e => {
+    const panel = root.querySelector(".carbp"); if (!panel) return;
+    const redraw = () => { const t = document.createElement("div"); t.innerHTML = carbPanel(ctx); const n = t.firstElementChild; panel.replaceWith(n); wireCarb(ctx, root); };
+    panel.addEventListener("click", e => {
       const b = e.target.closest("button"); if (!b) return;
-      const s0 = ctx.S[ctx.IDS[0]];
-      if (b.dataset.borrar) { try { localStorage.removeItem(carbRefKey(s0)); } catch (x) { } }
-      if (b.dataset.ref) {
-        const id = b.dataset.ref, s = ctx.S[id], c = (ctx.D.clima || {})[id], inp = box.querySelector(`input[data-id="${CSS.escape(id)}"]`), ch = +inp.value;
-        if (!c) return;
-        if (!(ch >= 80 && ch <= 260)) { inp.focus(); return; }
-        store.set(carbRefKey(s), { chicler: ch, rho: rhoSeco(c), agua: aguaDe(ctx, id), fecha: s.date && s.date.length == 10 ? `${s.date.slice(3, 5)}/${s.date.slice(0, 2)}/${s.date.slice(6)}` : s.date, tanda: ctx.BT(id) });
+      if (b.dataset.borrar) { try { localStorage.removeItem(carbRefKey(ctx.S[ctx.IDS[0]])); } catch (x) { } redraw(); }
+      if (b.dataset.senti) {
+        const id = b.dataset.senti, s = ctx.S[id];
+        carbModal(ctx, id, async vals => {
+          const man = Object.assign({}, (s.setup || {}).manual || {});
+          for (const k of CARB_KEYS) delete man[k];
+          Object.assign(man, vals);
+          const r = ctx.saveSetup ? await ctx.saveSetup(s, man) : null;
+          if (r && r.error) return r;
+          s.setup = s.setup || {}; s.setup.manual = man; s.setup.valores = Object.assign({}, s.setup.auto || {}, man);
+          // una tanda "en punto" pasa a ser la referencia de clima del kart
+          const c = (ctx.D.clima || {})[id];
+          if (vals.sensacion == "en punto" && c && (vals.chicler || vals.alta != null))
+            store.set(carbRefKey(s), { chicler: vals.carb_tipo == "cortina" ? vals.chicler : null, baja: vals.baja, alta: vals.alta, tipo: vals.carb_tipo, rho: rhoSeco(c), agua: aguaDe(ctx, id),
+              fecha: s.date && s.date.length == 10 ? `${s.date.slice(3, 5)}/${s.date.slice(0, 2)}/${s.date.slice(6)}` : s.date, tanda: ctx.BT(id) });
+          redraw();
+        });
       }
-      box.innerHTML = climaBlock(ctx);
-      const sem = root.querySelector(".carb-sem"); if (sem) sem.outerHTML = carbVotos(ctx);
+    });
+  }
+
+  /* --- lo que sentiste: tipo de carburador, ajuste, sensacion y detonacion --- */
+  const MEMBRANA = /IAME|X30|KA100|\bOK\b|\bKZ|VORTEX|\bTM\b|MODENA|TILLOTSON|IBEA/i;
+  const parseVueltas = v => { if (v == null || v === "") return null; if (typeof v == "number") return v; const m = String(v).replace(",", ".").trim().match(/^(\d+(?:\.\d+)?)?\s*(?:(\d+)\/(\d+))?$/); if (!m) return null; return (m[1] ? +m[1] : 0) + (m[2] ? +m[2] / +m[3] : 0); };
+  const vueltasTxt = v => { v = parseVueltas(v); if (v == null) return "–"; const n = Math.round(v * 8), e = Math.floor(n / 8), r = n % 8; const fr = ["", "1/8", "1/4", "3/8", "1/2", "5/8", "3/4", "7/8"][r]; return (e ? e + (fr ? " " : "") : "") + (fr || (e ? "" : "0")); };
+  function carbInfo(s) {
+    const V = (s.setup || {}).valores || {};
+    let motor = ""; try { motor = (window.KTK && KTK.get(s.kart).motor) || ""; } catch (e) { }
+    const tipo = V.carb_tipo || (MEMBRANA.test(motor + " " + (s.kart || "")) ? "membrana" : "cortina");
+    return { tipo, chicler: chiclerDe(s), aguja: V.aguja ?? null, baja: parseVueltas(V.baja), alta: parseVueltas(V.alta), sensacion: V.sensacion || null, donde: V.sensacion_donde || null, detonacion: V.detonacion || null };
+  }
+  const SENT = { gordo: "rico", fino: "pobre", "en punto": "ok" };
+  function coincidencia(ctx, id, sensacion) {
+    const v = carbVotosDe(ctx, id).filter(x => x != null), t = SENT[sensacion];
+    if (!v.length || !t) return null;
+    const opp = t == "rico" ? "pobre" : t == "pobre" ? "rico" : null;
+    const a = v.filter(x => x == t).length, c = t == "ok" ? v.filter(x => x != "ok").length : v.filter(x => x == opp).length;
+    return a && !c ? { k: "si", txt: `Coincide con los datos (${a} de ${v.length} indicios)` } : c && !a ? { k: "no", txt: "Los datos dicen lo contrario" }
+      : a && c ? { k: "mixto", txt: "Los datos están divididos" } : { k: "nada", txt: "Los datos no lo marcan" };
+  }
+  function datosVer(ctx, id) {
+    const v = carbVotosDe(ctx, id), g = v.filter(x => x == "rico").length, f = v.filter(x => x == "pobre").length, o = v.filter(x => x == "ok").length;
+    return g >= 2 ? "rico" : f >= 2 ? "pobre" : g && !f ? "rico?" : f && !g ? "pobre?" : g && f ? null : o >= 1 ? "ok" : null;
+  }
+  // sugerencia de cambio segun lo sentido + los datos
+  function sugerencia(ctx, id) {
+    const I = carbInfo(ctx.S[id]), dv = datosVer(ctx, id), cort = I.tipo == "cortina", out = [];
+    const det = I.detonacion && I.detonacion != "no";
+    const engordarArriba = cort ? `chicler <b>+2 a +3 números</b>${I.chicler ? ` (${I.chicler} → ${I.chicler + 2}/${I.chicler + 3})` : ""}` : `abrí la <b>alta 1/8 de vuelta</b>${I.alta != null ? ` (${vueltasTxt(I.alta)} → ${vueltasTxt(I.alta + 0.125)})` : ""}`;
+    const afinarArriba = cort ? `chicler <b>−2 números</b>${I.chicler ? ` (${I.chicler} → ${I.chicler - 2})` : ""}` : `cerrá la <b>alta 1/8 de vuelta</b>${I.alta != null ? ` (${vueltasTxt(I.alta)} → ${vueltasTxt(I.alta - 0.125)})` : ""}`;
+    const engordarAbajo = cort ? `aguja <b>un punto más rica</b> (clip una ranura más abajo)${I.aguja ? `, hoy en ${esc(I.aguja)}` : ""}` : `abrí la <b>baja 1/8 de vuelta</b>${I.baja != null ? ` (${vueltasTxt(I.baja)} → ${vueltasTxt(I.baja + 0.125)})` : ""}`;
+    const afinarAbajo = cort ? `aguja <b>un punto más pobre</b> (clip una ranura más arriba)${I.aguja ? `, hoy en ${esc(I.aguja)}` : ""}` : `cerrá la <b>baja 1/8 de vuelta</b>${I.baja != null ? ` (${vueltasTxt(I.baja)} → ${vueltasTxt(I.baja - 0.125)})` : ""}`;
+    if (det) {
+      out.push(`<b>Detonó${I.detonacion == "recta" ? " en la recta" : I.detonacion == "curvas" ? " en curvas" : ""}: engordá arriba ya</b> → ${engordarArriba}. Detonar rompe el pistón.`);
+      const ev = estiraVoto(ctx, id), ref = store.get(carbRefKey(ctx.S[id]), null), ag = aguaDe(ctx, id);
+      const pistas = [];
+      if (ev && ev.v == "pobre") pistas.push(`el motor estira más arriba (${ev.txt.replace("cerca del tope ", "")})`);
+      if ((dv || "").startsWith("pobre")) pistas.push("los indicios de carburación dan fina");
+      if (ag != null && ref && ref.agua != null && ag - ref.agua >= 5) pistas.push(`el agua estuvo ${f0(ag - ref.agua)} °C más caliente que en la referencia`);
+      out.push(pistas.length ? `Los datos acompañan: ${pistas.join("; ")}. Todo eso empuja a detonar.` : `Los datos no muestran mezcla fina: si sigue detonando, revisá nafta (octanaje), avance de encendido y squish.`);
+      if (CARRERA.test(ctx.S[id].comment || "")) out.push(rebufoTxt);
+      return out;
+    }
+    const ev0 = estiraVoto(ctx, id);
+    if (!I.sensacion) {
+      const r = dv ? [`Según los datos: ${dv.startsWith("rico") ? "tira a gorda" : dv.startsWith("pobre") ? "tira a fina" : "en punto"}${dv.endsWith("?") ? " (un solo indicio)" : ""}. Cargá lo que sentiste para cruzarlo.`] : [];
+      if (ev0 && ev0.v == "pobre" && CARRERA.test(ctx.S[id].comment || "")) r.push(rebufoTxt);
+      return r;
+    }
+    const sent = SENT[I.sensacion] || "ok", co = coincidencia(ctx, id, I.sensacion);
+    const coincide = !co || co.k == "nada" ? null : co.k == "si" ? true : co.k == "no" ? false : null;
+    const abajo = I.donde == "abajo";
+    if (sent == "ok") out.push(co && co.k != "si" && dv && dv != "ok" ? `Sentiste en punto pero hay indicios de mezcla ${dv.startsWith("rico") ? "gorda" : "fina"}: mantené y mirá la bujía.` : "En punto: mantené el ajuste. Con el clima de cada día te digo cómo corregirlo.");
+    else {
+      const cambio = sent == "rico" ? (abajo ? afinarAbajo : afinarArriba) : (abajo ? engordarAbajo : engordarArriba);
+      out.push(`${coincide ? "Coincide con los datos" : coincide === false ? "Los datos no lo confirman: probá de a medio paso" : "Sin datos para confirmar"} → ${cambio}.`);
+      if (sent == "pobre") out.push("Fino arriba es riesgoso: ante la duda, engordá.");
+    }
+    return out;
+  }
+  const rebufoTxt = "En carrera, con rebufo, el motor pasa más vueltas y va más tiempo a fondo: es cuando más detona. Para carrera conviene ir 2 números más gordo arriba que en clasificación (o 1/8 de vuelta más abierta la alta).";
+  function sentiBlock(ctx) {
+    const { IDS, S, COL, BT } = ctx;
+    const li = IDS.map(id => {
+      const I = carbInfo(S[id]), dv = datosVer(ctx, id);
+      const aj = I.tipo == "cortina" ? [I.chicler ? `chicler ${I.chicler}` : "", I.aguja ? `aguja ${esc(I.aguja)}` : ""].filter(Boolean).join(" · ")
+        : [I.baja != null ? `baja ${vueltasTxt(I.baja)}` : "", I.alta != null ? `alta ${vueltasTxt(I.alta)}` : ""].filter(Boolean).join(" · ");
+      const sentTxt = I.sensacion ? `Sentiste <b>${esc(I.sensacion)}</b>${I.donde ? ` ${I.donde == "todo" ? "en todo el rango" : I.donde}` : ""}` : `<span class="muted">Sin cargar lo que sentiste</span>`;
+      const detTxt = I.detonacion && I.detonacion != "no" ? ` · <span class="chip bad">Detonó: ${esc(I.detonacion)}</span>` : "";
+      const co = I.sensacion ? coincidencia(ctx, id, I.sensacion) : null;
+      const coinc = co ? `<span class="chip ${co.k == "si" ? "good" : co.k == "no" ? "bad" : ""}">${co.txt}</span>` : "";
+      const sug = sugerencia(ctx, id);
+      return `<li>${IDS.length > 1 ? `<span class="dot" style="--c:${COL[id]}"></span><b>${BT(id)}</b> · ` : ""}${sentTxt}${detTxt} ${coinc}
+        <span class="small ink2">· carburador a ${I.tipo}${aj ? " · " + aj : ""}</span>
+        ${sug.length ? `<div class="carb-sug">${sug.map(x => `<p class="small">${x}</p>`).join("")}</div>` : ""}
+        ${ctx.saveSetup ? `<div class="carb-ref"><button class="btn small" data-senti="${esc(id)}">${I.sensacion || I.detonacion ? "Editar" : "Cargar"} lo que sentiste</button></div>` : ""}</li>`;
+    }).join("");
+    return `<ul class="why compact carb-l">${li}</ul>`;
+  }
+  function carbModal(ctx, id, onSave) {
+    const s = ctx.S[id], I = carbInfo(s);
+    const seg = (name, opts, val) => `<div class="seg" role="radiogroup">${opts.map(([v, l]) => `<label><input type="radio" name="${name}" value="${v}" ${val == v ? "checked" : ""}><span>${l}</span></label>`).join("")}</div>`;
+    const d = document.createElement("div"); d.className = "modal";
+    d.innerHTML = `<form class="mbox" role="dialog" aria-modal="true" aria-labelledby="cm-t"><h2 id="cm-t">Carburación · ${esc(ctx.BT(id))} · ${esc(s.hour)}</h2>
+      <label class="cm-row"><span>Carburador</span>${seg("tipo", [["cortina", "A cortina (Rotax)"], ["membrana", "A membrana (IAME, OK)"]], I.tipo)}</label>
+      <div class="cm-cort sgrid"><label><span>Chicler</span><input id="cm-ch" inputmode="numeric" value="${esc(I.chicler ?? "")}"></label><label><span>Aguja <span class="muted">(ranura del clip)</span></span><input id="cm-ag" value="${esc(I.aguja ?? "")}"></label></div>
+      <div class="cm-memb sgrid"><label><span>Baja <span class="muted">(vueltas, ej. 1 3/4)</span></span><input id="cm-ba" value="${I.baja != null ? vueltasTxt(I.baja) : ""}"></label><label><span>Alta <span class="muted">(vueltas)</span></span><input id="cm-al" value="${I.alta != null ? vueltasTxt(I.alta) : ""}"></label></div>
+      <label class="cm-row"><span>¿Cómo lo sentiste?</span>${seg("sen", [["gordo", "Gordo"], ["en punto", "En punto"], ["fino", "Fino"]], I.sensacion)}</label>
+      <label class="cm-row"><span>¿Dónde?</span>${seg("don", [["abajo", "Abajo (salida de curva)"], ["arriba", "Arriba (final de recta)"], ["todo", "En todo"]], I.donde)}</label>
+      <label class="cm-row"><span>¿Detonó?</span>${seg("det", [["no", "No"], ["recta", "En recta"], ["curvas", "En curvas"], ["ambas", "En las dos"]], I.detonacion || "no")}</label>
+      <p class="small" id="cm-msg"></p>
+      <div class="mact"><button type="button" class="btn" id="cm-x">Cancelar</button><button type="submit" class="btn primary">Guardar</button></div></form>`;
+    document.body.appendChild(d);
+    const tipo = () => d.querySelector('input[name="tipo"]:checked').value;
+    const sync = () => { d.querySelector(".cm-cort").hidden = tipo() != "cortina"; d.querySelector(".cm-memb").hidden = tipo() != "membrana"; };
+    d.querySelectorAll('input[name="tipo"]').forEach(x => x.addEventListener("change", sync)); sync();
+    d.querySelector("#cm-x").addEventListener("click", () => d.remove());
+    d.querySelector("form").addEventListener("submit", async e => {
+      e.preventDefault();
+      const val = n => (d.querySelector(`input[name="${n}"]:checked`) || {}).value || null, msg = d.querySelector("#cm-msg");
+      const v = { carb_tipo: tipo(), sensacion: val("sen"), sensacion_donde: val("don"), detonacion: val("det") };
+      if (tipo() == "cortina") {
+        const ch = d.querySelector("#cm-ch").value.trim(), ag = d.querySelector("#cm-ag").value.trim();
+        if (ch) { if (!(+ch >= 80 && +ch <= 260)) { msg.className = "small b"; msg.textContent = "El chicler tiene que ser un número (por ejemplo 165)."; return; } v.chicler = +ch; }
+        if (ag) v.aguja = ag;
+      } else {
+        for (const [k, sel] of [["baja", "#cm-ba"], ["alta", "#cm-al"]]) {
+          const t = d.querySelector(sel).value.trim(); if (!t) continue;
+          const n = parseVueltas(t); if (n == null || n < 0 || n > 6) { msg.className = "small b"; msg.textContent = `No entiendo las vueltas de ${k}: escribilo como 1 3/4 o 1.75.`; return; }
+          v[k] = Math.round(n * 8) / 8;
+        }
+      }
+      for (const k of Object.keys(v)) if (v[k] == null) delete v[k];
+      const r = await onSave(v);
+      if (r && r.error) { msg.className = "small b"; msg.textContent = r.error; return; }
+      d.remove();
     });
   }
   /* --- resumen: los tres indicios por tanda --- */
+  function carbVotosDe(ctx, id) {
+    const c = ctx.M.sessions[id].carburacion, e = estiraVoto(ctx, id), k = climaVoto(ctx, id);
+    return [c && !c.pocos ? c.estado : null, e ? e.v : null, k ? k.v : null];
+  }
   function carbVotos(ctx) {
     const { IDS, M, COL, BT } = ctx;
     const rows = IDS.map(id => {
-      const c = M.sessions[id].carburacion, e = estiraVoto(ctx, id), k = climaVoto(ctx, id);
-      const v = [c && !c.pocos ? c.estado : null, e ? e.v : null, k ? k.v : null];
+      const v = carbVotosDe(ctx, id);
       const chip = (x, n) => x == null ? `<span class="chip">${n}: –</span>` : `<span class="chip ${x == "ok" ? "good" : "bad"}">${n}: ${x == "ok" ? "en punto" : x == "rico" ? "gordo" : "fino"}</span>`;
       const g = v.filter(x => x == "rico").length, f = v.filter(x => x == "pobre").length, n = v.filter(x => x != null).length, o = v.filter(x => x == "ok").length;
       const one = v.find(x => x != null), lbl = x => x == "ok" ? "en punto" : x == "rico" ? "gorda" : "fina";
-      const res = g >= 2 ? `<b>Gorda</b>: coinciden ${g} indicios` : f >= 2 ? `<b>Fina</b>: coinciden ${f} indicios` : o >= 2 ? "<b>En punto</b>" : n == 1 ? `Un solo indicio: ${lbl(one)}` : n ? "Los indicios no coinciden" : "Sin datos";
+      const res = g >= 2 ? `<b>Gorda</b>: coinciden ${g} indicios` : f >= 2 ? `<b>Fina</b>: coinciden ${f} indicios` : g && f ? "Los indicios no coinciden"
+        : g ? "<b>Tira a gorda</b> (1 indicio)" : f ? "<b>Tira a fina</b> (1 indicio)" : o >= 2 ? "<b>En punto</b>" : n == 1 ? `Un solo indicio: ${lbl(one)}` : "Sin datos";
       return `<li>${IDS.length > 1 ? `<span class="dot" style="--c:${COL[id]}"></span><b>${BT(id)}</b> · ` : ""}${res}<br>${chip(v[0], "Picos")} ${chip(v[1], "Estira")} ${chip(v[2], "Clima")}</li>`;
     }).join("");
     return `<ul class="why compact carb-sem">${rows}</ul>`;

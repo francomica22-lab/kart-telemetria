@@ -330,6 +330,28 @@ def _estira(d, n_boot=40, seed=1):
     return out
 
 
+def _sube(d, gears, lo, hi):
+    """Cuantas rpm por segundo sube el motor cerca del tope, en la marcha mas larga y casi en recta, por vuelta.
+    Un motor mas fino estira mas arriba (y es el que detona); uno gordo se planta. La banda es comun a todas las tandas
+    del analisis (1350 a 350 rpm debajo del tope tipico) para que se puedan comparar."""
+    if not gears or d.empty:
+        return None
+    top_g = min(gears, key=lambda g: gears[g])
+    vals = []
+    for lap, q in d.groupby("lap"):
+        q = q.sort_values("t")
+        if len(q) < 9:
+            continue
+        rate = np.gradient(savgol_filter(q.rpm.values.astype(float), 7, 2), q.t.values / 1000.0)
+        m = (q.gear.values == top_g) & (q.lat.values < 0.35) & (q.rpm.values >= lo) & (q.rpm.values < hi) & (rate > 0)
+        if m.sum() >= 5:
+            vals.append(float(np.median(rate[m])))
+    if len(vals) < 3:
+        return None
+    v = np.array(vals)
+    return dict(banda=[round(lo), round(hi)], med=round(float(np.median(v))), se=round(float(v.std(ddof=1) / np.sqrt(len(v)))), n=len(v))
+
+
 def _shifts(d):
     out = []
     for lap, q in d.groupby("lap"):
@@ -370,6 +392,10 @@ def analyze(S, laps_by_ses, ref_id, ref_len, corners, bands=None):
             shifts=dict(n=len(sh), rpm_antes=float(np.median([x["rpm_antes"] for x in sh])) if sh else None,
                         rpm_despues=float(np.median([x["rpm_despues"] for x in sh])) if sh else None),
             laps=laps)
+
+    tope = float(np.median([series[sid].rpm.quantile(0.995) for sid in series]))
+    for sid in series:
+        res["sessions"][sid]["sube"] = _sube(series[sid], gears, tope - 1350, tope - 350)
 
     # comparaciones contra la tanda de referencia: igual marcha y misma salida de curva
     for sid in S:

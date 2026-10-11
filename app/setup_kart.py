@@ -23,6 +23,15 @@ FIELDS = [
     ("motor", "Motor", ""),
     ("escape", "Escape", ""),
     ("notas", "Notas", ""),
+    # carburacion: lo carga el formulario "Lo que sentiste" de la seccion Carburacion
+    ("carb_tipo", "Tipo de carburador", ""),        # cortina / membrana
+    ("chicler", "Chicler", "nro"),
+    ("aguja", "Aguja (ranura del clip)", ""),
+    ("baja", "Tornillo de baja", "vueltas"),
+    ("alta", "Tornillo de alta", "vueltas"),
+    ("sensacion", "Sensación de carburación", ""),  # gordo / en punto / fino
+    ("sensacion_donde", "Dónde se sintió", ""),     # abajo / arriba / todo
+    ("detonacion", "Detonación", ""),               # no / recta / curvas / ambas
 ]
 
 
