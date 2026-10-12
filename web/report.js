@@ -28,10 +28,12 @@
           <div class="eyebrow">${esc([...new Set(D.sessions.map(s => fecha(s.date)))].join(" · "))} · ${esc([...new Set(D.sessions.map(s => s.kart))].join(" / "))} · ${multiDriver ? "pilotos " + esc([...new Set(D.sessions.map(s => s.driver))].join(" / ")) : "piloto " + esc(D.sessions[0].driver || "")} · pista ${Math.round(D.track.L)} m</div>
           <h1>${IDS.length > 1 ? IDS.map(BT).join(" vs ") : "Tanda " + BT(IDS[0])}</h1>
         </div>
-        <div class="rep-actions"><div class="muted" style="font-size:12.5px">${IDS.length > 1 ? `Referencia: ${BT(REF)} · ${S[REF].hour} (vuelta ${D.ref_lap}, tanda ${REF})` : `Mejor vuelta: ${D.ref_lap} · tanda ${REF}`}</div>
-          ${opts.onShare ? `<button class="btn primary shbtn" style="width:auto">Compartir</button>` : ""}
-          ${opts.onExport ? `<button class="btn expbtn">Exportar HTML</button>` : ""}</div>
+        <div class="rep-actions">
+          <div class="modesw" role="group" aria-label="Tipo de análisis"><button data-m="simple">Simple</button><button data-m="detalle">Detallado</button></div>
+          ${opts.onShare ? `<button class="btn primary shbtn">Compartir</button>` : ""}
+          ${opts.onExport ? `<button class="btn ghost expbtn">Exportar</button>` : ""}</div>
       </div>
+      <div class="ses-strip">${IDS.map(id => { const s = S[id], c = (D.clima || {})[id]; return `<span class="ss" style="--c:${COL[id]}"><b>${BT(id)}</b> <span class="muted">${s.hour}${multiDriver ? " · " + esc(s.driver || "?") : ""}${c ? ` · ${c.T.toFixed(0)} °C` : ""}${s.comment ? " · " + esc(s.comment.split("\n")[0].slice(0, 24)) : ""}</span></span>`; }).join("")}</div>
       <div class="cards-ses">${IDS.map(id => {
         const s = S[id], w = s.laps.filter(l => s.top.includes(l.t) && l.agua != null).map(l => l.agua);
         return `<div class="sc" style="--c:${COL[id]}"><div class="eyebrow">${s.hour} · ${esc(s.kart)} · <span style="opacity:.7">tanda ${id}</span></div>
@@ -43,9 +45,6 @@
           <div class="schips">${KTX.setupChips(D, s)}</div>
           ${opts.saveSetup ? `<button class="link setbtn" data-id="${id}">Editar setup</button>` : ""}</div>`;
       }).join("")}</div>
-      <div class="modesw" role="group" aria-label="Tipo de análisis">
-        <button data-m="simple">Análisis simple</button><button data-m="detalle">Análisis detallado</button>
-      </div>
       <div class="simple"></div>
       <div class="detalle">
       <div class="tabs" role="tablist">
@@ -67,6 +66,7 @@
     const setMode = m => {
       modeBtns.forEach(b => b.classList.toggle("on", b.dataset.m == m));
       root.querySelector(".simple").hidden = m != "simple"; root.querySelector(".detalle").hidden = m == "simple";
+      root.querySelector(".rep").classList.toggle("m-simple", m == "simple");
       try { localStorage.setItem("kt-mode", m); } catch (e) { }
     };
     let mode0 = "simple"; try { mode0 = localStorage.getItem("kt-mode") || "simple"; } catch (e) { }
@@ -304,45 +304,107 @@
         const win = d.pct > 0 ? id : REF;
         return `El motor rindió un poco más en la ${BT(win)} (${f1(d.pct)}%). Si es el mismo motor, puede ser por el clima o la carburación.`;
       };
-      let h = !others.length ? `<section class="sp"><div class="sp-head"><div class="eyebrow">${NAME(REF)}</div>
-          <p class="sp-big">Tu mejor vuelta fue <b>${BT(REF)}</b>. Juntando tus mejores curvas podrías hacer <b>${D.optimo[REF].optima.toFixed(3)}</b>.</p>
-          <p class="ink2">Tu promedio fue ${D.optimo[REF].promedio.toFixed(3)} en ${D.optimo[REF].vueltas} vueltas. Para comparar contra otra tanda, elegí dos o más.</p></div>
-          ${KTX.simpleOptimo(ctx, REF)}</section>` : "";
+      // constancia: desvio de las vueltas buenas (sin salida ni entrada a boxes)
+      const constancia = id => {
+        const L = S[id].laps.map(l => l.t), best = Math.min(...L), ok = L.filter(t => t <= best * 1.03);
+        if (ok.length < 3) return null;
+        const m = avg(ok), sd = Math.sqrt(avg(ok.map(t => (t - m) ** 2)));
+        return { sd, txt: sd < 0.15 ? "Muy constante" : sd < 0.3 ? "Constante" : "Irregular", ok: sd < 0.3 };
+      };
+      const corto = t => t.replace(/\s*\([^)]*\)/g, "");
+      const motorTile = id => {
+        const fa = ((M.sessions[id] || {}).fallas || {}).grupos || [], f = fa.find(g => g.n >= 2 && g.curva);
+        if (f) return { ok: false, t: "Posible falla", d: `curva ${f.curva}, vueltas ${f.vueltas.join(", ")}` };
+        const c = M.compare.find(x => x.ses == id); if (!c) return { ok: true, t: "Sin comparar", d: "" };
+        const gs = Object.keys(M.gears).map(Number), tg = gs.find(g => M.gears[g] == Math.min(...gs.map(x => M.gears[x]))), d = c.dyno[tg] || c.dyno[String(tg)];
+        if (!d) return { ok: true, t: "Sin datos", d: "" };
+        if (!d.real) return { ok: true, t: "Rindió igual", d: "" };
+        return { ok: true, t: `${f1(d.pct)}% ${d.pct > 0 ? "más" : "menos"}`, d: `en la ${BT(id)}` };
+      };
+      const tile = (lbl, val, sub, cls = "") => `<div class="tile ${cls}"><div class="eyebrow">${lbl}</div><div class="tv">${val}</div>${sub ? `<div class="ts">${sub}</div>` : ""}</div>`;
+      const carbTxt = id => { const c = KTX.carbCorto ? KTX.carbCorto(ctx, id) : null; return c ? `carburación ${c}` : ""; };
+      const optTile = id => {
+        const op = D.optimo[id]; if (!op) return "";
+        const t = KTX.optimoTips(op)[0];
+        return tile("Vuelta posible", op.optima.toFixed(3), `${(op.mejor - op.optima).toFixed(2)} s menos${t ? ` · repetí la curva ${t.n} de la vuelta ${t.lap}` : ""}`);
+      };
+      const shortTip = p => {
+        if (p.k == "agarre") return "Le faltó agarre: gomas o setup";
+        const A = p.a.t3, B = p.b.t3, t = [];
+        if (posDiff(p.a, p.b, "s_vmin", 4) < 0) t.push("Girá más tarde");
+        if (B.freno_max - A.freno_max <= -0.12) t.push("Frená más fuerte y corto");
+        if (posDiff(p.a, p.b, "s_acel", 4) > 0) t.push("Acelerá antes");
+        if (posDiff(p.a, p.b, "off_apex", 0.6)) t.push(`Repetí la línea de la ${BT(REF)}`);
+        if (!t.length && B.v_salida - A.v_salida <= -0.8) t.push("Priorizá la salida");
+        if (!t.length) { const prev = C.find(c => c.n == p.n - 1); if (prev && prev.by[p.id].t3.v_salida - prev.by[REF].t3.v_salida <= -0.8) t.push(`Salí mejor de la curva ${p.n - 1}`); }
+        if (!t.length) return p.k == "mixto" ? "Repetí la línea de tu mejor tanda" : "Sin un error claro: miralo en el video";
+        return t.slice(0, 2).join(" y ");
+      };
+      // las vueltas como una linea chica por tanda (abajo = mas rapido)
+      const lapsSpark = () => {
+        const all = IDS.flatMap(id => S[id].laps.map(l => l.t)), best = Math.min(...all), lo = best, hi = Math.min(Math.max(...all), best * 1.04);
+        const n = Math.max(...IDS.map(id => S[id].laps.length)), W = 600, H = 140, X = i => 24 + i * (W - 48) / Math.max(n - 1, 1), Y = t => 30 + (Math.min(t, hi) - lo) / Math.max(hi - lo, 0.2) * (H - 42);
+        let g = `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="Tiempo de cada vuelta">`;
+        for (const id of IDS) {
+          const L = S[id].laps, b = Math.min(...L.map(l => l.t)), pts = L.map((l, i) => `${X(i).toFixed(1)},${Y(l.t).toFixed(1)}`);
+          g += `<polyline points="${pts.join(" ")}" fill="none" stroke="${COL[id]}" stroke-width="2.5" stroke-linejoin="round" opacity=".85"/>`;
+          L.forEach((l, i) => { g += `<circle cx="${X(i).toFixed(1)}" cy="${Y(l.t).toFixed(1)}" r="${l.t == b ? 5 : 2.5}" fill="${COL[id]}"><title>V${l.lap}: ${l.t.toFixed(3)}</title></circle>`; });
+          const ib = L.findIndex(l => l.t == b);
+          g += `<text x="${X(ib).toFixed(1)}" y="${(Y(b) - 10).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="600" fill="${COL[id]}">${b.toFixed(3)}</text>`;
+        }
+        return g + `</svg><p class="small ink2">Cada punto es una vuelta: más arriba, más rápida. Las vueltas lentas (salida de boxes) quedan cortadas abajo.</p>`;
+      };
+      // alerta compacta
+      const alertC = (() => {
+        const items = IDS.flatMap(id => (((M.sessions[id] || {}).fallas || {}).grupos || []).filter(g => g.n >= 2 && g.curva).map(g => ({ id, g })));
+        return items.length ? `<div class="alertc"><span class="bang">!</span><span><b>Posible falla de motor</b> · ${items.map(({ id, g }) => `${TAG(id)} curva ${g.curva}, vueltas ${g.vueltas.join(", ")}`).join(" · ")}</span> <button class="link" data-gom="1">ver</button></div>` : "";
+      })();
+
+      let h = "";
+      if (!others.length) {
+        const op = D.optimo[REF], co = constancia(REF), tips = op ? KTX.optimoTips(op).slice(0, 3) : [];
+        h += `<section class="sp2">
+          <div class="hero" style="--c:${COL[REF]}"><div class="hero-n"><span class="big">${BT(REF)}</span><span class="small ink2">tu mejor vuelta</span></div>
+            <div class="hero-t">${op ? `<p class="lead2">Podés hacer <b>${op.optima.toFixed(3)}</b> juntando tus mejores curvas.</p><p class="ink2">Son <b>${(op.mejor - op.optima).toFixed(2)} s</b> que ya hiciste, pero en vueltas distintas.</p>` : ""}</div></div>
+          ${tips.length ? `<div class="panel"><div class="eyebrow">Repetí lo que ya hiciste bien</div><ol class="todo">${tips.map(t => `<li><span class="nb">${t.n}</span><div><b>${t.why.length ? corto(t.why[0]).replace(/^./, c => c.toUpperCase()) : "Repetí esa curva"}</b><small>vuelta ${t.lap} · ${t.gain.toFixed(2)} s mejor que tu promedio</small></div></li>`).join("")}</ol></div>` : ""}
+          <div class="tiles">${co ? tile("Constancia", co.txt, `±${co.sd.toFixed(2)} s entre vueltas`, co.ok ? "" : "warn") : ""}
+            ${(() => { const m = motorTile(REF); return tile("Motor", m.ok ? (m.t == "Sin comparar" ? "OK" : m.t) : m.t, [m.d, carbTxt(REF)].filter(Boolean).join(" · "), m.ok ? "" : "bad"); })()}</div>
+        </section>`;
+      }
       for (const id of others) {
         const gap = avg(S[id].top) - avg(S[REF].top);
         const parts = C.map(c => ({ id, n: c.n, k: c.diag[id][0], d: c.diag[id][1], a: c.by[REF], b: c.by[id] }));
         const lost = parts.filter(p => ["manejo", "agarre", "mixto"].includes(p.k)).sort((x, y) => y.d - x.d), won = parts.filter(p => p.k == "gana");
-        const slower = gap > 0 ? id : REF, faster = slower == id ? REF : id;
-        h += `<section class="sp">
-          <div class="sp-head">
-            <div class="eyebrow">${NAME(id)} contra ${NAME(REF)}</div>
-            <p class="sp-big">La ${TAG(slower)} fue <b>${Math.abs(gap).toFixed(2)} s más lenta</b> por vuelta que la ${TAG(faster)}.</p>
-            <p class="ink2 small">≈ ${(Math.abs(gap) * 10).toFixed(1)} s en 10 vueltas</p>
+        const sum = k => lost.filter(p => p.k == k).reduce((a, p) => a + p.d, 0), man = sum("manejo"), agr = sum("agarre"), mix = sum("mixto");
+        const porque = !lost.length ? "sin una curva clara" : man >= 2 * agr && man >= mix ? "manejo" : agr >= 2 * man && agr >= mix ? "agarre" : mix > man && mix > agr ? "manejo y agarre, difícil de separar" : "manejo y agarre";
+        const slower = gap > 0 ? id : REF, faster = slower == id ? REF : id, m = motorTile(id), co = constancia(id);
+        h += `<section class="sp2">
+          ${others.length > 1 ? `<div class="eyebrow">${NAME(id)} contra ${NAME(REF)}</div>` : ""}
+          <div class="hero" style="--c:${COL[slower]}">
+            <div class="hero-n"><span class="big">${Math.abs(gap) < 0.005 ? "=" : "+" + Math.abs(gap).toFixed(2) + " s"}</span><span class="small ink2">por vuelta</span></div>
+            <div class="hero-t"><p class="lead2">La ${TAG(slower)} fue más lenta que la ${TAG(faster)}.</p>
+              <p class="why1">Se perdió por <b>${porque}</b>.</p>
+              <div class="hero-c">${lost.length ? `<span class="chip manejo">manejo ${man.toFixed(2)} s</span><span class="chip agarre">agarre ${agr.toFixed(2)} s</span>${mix >= 0.02 ? `<span class="chip mixto">dudoso ${mix.toFixed(2)} s</span>` : ""}` : ""}<span class="chip ${m.ok ? "" : "bad"}">motor: ${m.t.toLowerCase()}</span></div></div>
           </div>
           <div class="sp-grid">
-            <div class="panel sp-map"><div class="eyebrow">Dónde se pierde tiempo</div><svg viewBox="-30 -20 360 380" data-id="${id}"></svg>
+            <div class="panel sp-map"><div class="eyebrow">Dónde</div><svg viewBox="-30 -20 360 380" data-id="${id}"></svg>
               <div class="sp-leg"><span class="lose">pierde</span><span class="win">gana</span><span class="even">igual</span></div></div>
-            <div class="sp-right">
-              <div class="panel"><div class="eyebrow" style="margin-bottom:8px">Qué hacer para bajar el tiempo</div>
-                ${lost.length ? `<ol class="tips">${lost.slice(0, 3).map(p => `<li><span class="tc">Curva ${p.n}<small>+${p.d.toFixed(2)} s</small></span><span>${tipFor(p)}</span></li>`).join("")}</ol>` : `<p>No hay curvas donde se pierda tiempo de forma clara.</p>`}
-                ${won.length ? `<p class="ink2 small" style="margin-top:10px">Bien hecho en ${won.map(p => "la curva " + p.n).join(" y ")}: ahí la ${BT(id)} fue más rápida.</p>` : ""}
-              </div>
-              <div class="panel"><div class="eyebrow" style="margin-bottom:6px">Motor</div><p>${motorSimple(id)}</p>${KTX.carbSimple(ctx)}</div>
-              ${KTX.simpleOptimo(ctx, id)}
+            <div class="sp-right"><div class="panel"><div class="eyebrow">Qué hacer</div>
+              ${lost.length ? `<ol class="todo">${lost.slice(0, 3).map(p => `<li><span class="nb">${p.n}</span><div><b>${shortTip(p)}</b><small>curva ${p.n} · ${p.k == "manejo" ? "manejo" : p.k == "agarre" ? "agarre" : "dudoso"} · +${p.d.toFixed(2)} s</small></div></li>`).join("")}</ol>` : `<p>No hay curvas donde se pierda tiempo de forma clara.</p>`}
+              ${won.length ? `<p class="okline">✓ Bien en ${won.map(p => "curva " + p.n).join(" y ")}</p>` : ""}
             </div>
+            <div class="tiles">
+              ${tile("Motor", m.t, [m.d, carbTxt(id)].filter(Boolean).join(" · "), m.ok ? "" : "bad")}
+              ${optTile(id)}
+              ${co ? tile("Constancia", co.txt, `±${co.sd.toFixed(2)} s entre vueltas`, co.ok ? "" : "warn") : ""}
+            </div></div>
           </div>
         </section>`;
       }
-      h += `<div class="panel"><div class="eyebrow" style="margin-bottom:10px">Tus vueltas</div><div class="laps-simple">${IDS.map(id => {
-        const s = S[id], best = Math.min(...s.laps.map(l => l.t)), worst = Math.max(...s.laps.map(l => l.t));
-        return `<div class="ls"><div class="ls-h"><span class="dot" style="--c:${COL[id]}"></span>${NAME(id)}</div>` + s.laps.map(l => {
-          const w = 30 + 70 * (1 - (l.t - best) / Math.max(worst - best, 0.3));
-          return `<div class="lr"><span class="muted">V${l.lap}</span><span class="lb"><i style="width:${w.toFixed(0)}%;background:${COL[id]};opacity:${l.t == best ? 1 : .45}"></i></span><span class="num${l.t == best ? " g" : ""}">${l.t.toFixed(3)}</span></div>`;
-        }).join("") + `</div>`;
-      }).join("")}</div><p class="ink2 small" style="margin-top:8px">La barra más larga es la vuelta más rápida de cada tanda.</p></div>
-      <p class="ink2 small">¿Querés ver el porqué de cada número? Pasá al <button class="link" data-go="detalle">análisis detallado</button>.</p>`;
-      if (D.circuito) h += `<div class="panel"><div class="eyebrow" style="margin-bottom:6px">El circuito</div><p>${esc(D.circuito.nombre || "")}: ${D.circuito.largo} m · ${D.circuito.curvas.length} curvas · ${D.circuito.v_media} km/h de promedio · agarre ${D.circuito.grip_nivel}. <button class="link" data-go2="8">Ver ficha</button></p></div>`;
-      box.innerHTML = alertsHTML + h;
+      h += `<div class="panel"><div class="eyebrow" style="margin-bottom:6px">Tus vueltas</div>${lapsSpark()}<div class="legend">${legend(IDS)}</div></div>
+      <p class="ink2 small foot">${D.circuito ? `${esc(D.circuito.nombre || "")} · ${D.circuito.largo} m · ${D.circuito.curvas.length} curvas · <button class="link" data-go2="8">ficha del circuito</button> · ` : ""}<button class="link" data-go="detalle">ver el porqué de cada número</button></p>`;
+      box.innerHTML = alertC + h;
+      const gm = box.querySelector("[data-gom]"); if (gm) gm.addEventListener("click", () => { setMode("detalle"); root.querySelector('.tab[data-t="2"]').click(); });
       const g2 = box.querySelector("[data-go2]"); if (g2) g2.addEventListener("click", () => { setMode("detalle"); root.querySelector('.tab[data-t="8"]').click(); });
       box.querySelector("[data-go]").addEventListener("click", () => { setMode("detalle"); root.scrollIntoView(); });
       box.querySelectorAll(".sp-map svg").forEach(svg => {

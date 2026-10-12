@@ -359,6 +359,13 @@
     return out;
   }
   const rebufoTxt = "En carrera, con rebufo, el motor pasa más vueltas y va más tiempo a fondo: es cuando más detona. Para carrera conviene ir 2 números más gordo arriba que en clasificación (o 1/8 de vuelta más abierta la alta).";
+  // una palabra para el modo simple
+  function carbCorto(ctx, id) {
+    const I = carbInfo(ctx.S[id]);
+    if (I.detonacion && I.detonacion != "no") return "con detonación";
+    const v = datosVer(ctx, id);
+    return v == null ? null : v == "ok" ? "en punto" : v.startsWith("rico") ? "tira a gorda" : "tira a fina";
+  }
   function sentiBlock(ctx) {
     const { IDS, S, COL, BT } = ctx;
     const li = IDS.map(id => {
@@ -833,5 +840,5 @@
     root.querySelector(".csim").innerHTML = others.length ? `<div class="tw"><table><thead><tr><th>Circuito</th><th>Parecido</th><th>Largo</th><th>V media</th><th>Curvas</th><th>Agarre</th></tr></thead><tbody>${others.map(o => `<tr title="${esc(o.resumen)}"><td>${esc(o.nombre || "–")}</td><td class="${o.sim >= 75 ? "g" : ""}">${o.sim}%</td><td>${o.largo} m</td><td>${o.v_media} km/h</td><td>${o.curvas}</td><td>${o.grip} g</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted small">Todavía no hay otros circuitos guardados. Cuando analices tandas de otra pista, aparece acá cuánto se parece a ${esc(c.nombre || "esta")}.</p>`;
   }
 
-  window.KTX = { circuitPane, wireCircuit, circuitSummary, audioSpectrum, spectralSync, setupDiff, setupChips, setupModal, climaTxt, optimoPane, simpleOptimo, optimoTips, lapTrend, powerPanel, drawPower, hpDelta, carbPanel, carbSimple, wireCarb, transPane, wireTrans, sensorsPane, drawWater, videoPane, wireVideo, store };
+  window.KTX = { circuitPane, wireCircuit, circuitSummary, audioSpectrum, spectralSync, setupDiff, setupChips, setupModal, climaTxt, optimoPane, simpleOptimo, optimoTips, lapTrend, powerPanel, drawPower, hpDelta, carbPanel, carbSimple, wireCarb, carbCorto, transPane, wireTrans, sensorsPane, drawWater, videoPane, wireVideo, store };
 })();
