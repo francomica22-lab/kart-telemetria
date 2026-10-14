@@ -431,3 +431,46 @@ p.foot{background:none;border:0;padding:0;max-width:none}
   .sp-right .tiles{grid-template-columns:1fr 1fr}
   .tile .tv{font-size:19px}
 }
+
+/* ===== inicio estilo Race Studio: circuitos + tabla de tandas por dia ===== */
+.pad-x{padding:12px 8px 6px}
+.circ-row{display:grid;grid-template-columns:1fr auto;gap:2px 8px;width:100%;text-align:left;padding:10px 10px;border:1px solid transparent;border-radius:6px;background:none;color:var(--ink);cursor:pointer;font:inherit}
+.circ-row:hover{background:var(--panel)}
+.circ-row.on{background:var(--panel2);border-color:var(--line)}
+.circ-row .cn{font:600 15px var(--display);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.circ-row .cs{grid-row:1;grid-column:2;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--ink);color:var(--bg);font:700 12px var(--display);display:grid;place-items:center}
+.circ-row .cm{grid-column:1 / 3;font-size:12px;color:var(--muted)}
+#home{padding:22px 28px 60px;display:grid;gap:12px;align-content:start}
+.home-h{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.home-h h1{font-size:30px;margin:2px 0}
+.home-h p{margin:0}
+.home-h .btn{width:auto}
+.stbl{width:100%;border-collapse:collapse;font-size:14px;table-layout:auto}
+.stbl th{position:sticky;top:0;z-index:2;background:var(--bg);text-align:left;font:600 11px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)}
+.stbl td{padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.stbl .dayrow td{background:var(--panel2);padding:10px;border-bottom:1px solid var(--line);font-size:14px}
+.stbl .dayrow b{font-family:var(--display);letter-spacing:.06em}
+.stbl .srow{cursor:pointer;box-shadow:inset 3px 0 0 var(--c)}
+.stbl .srow:hover td{background:var(--panel)}
+.stbl .srow.sel td{background:color-mix(in srgb,var(--c) 14%,var(--panel))}
+.stbl .srow:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
+.stbl .srow.nolap td{color:var(--muted)}
+.stbl .best{font:600 16px var(--mono)}
+.stbl .best.top{color:var(--good)}
+.stbl .ses{font-weight:600}
+.stbl .c-com{max-width:280px;overflow:hidden;text-overflow:ellipsis}
+.stbl .num{font-variant-numeric:tabular-nums}
+.chk{display:inline-block;width:18px;height:18px;border:1.5px solid var(--muted);border-radius:4px;background:none;padding:0;cursor:pointer;vertical-align:middle}
+.chk.on{background:var(--c,var(--ink));border-color:var(--c,var(--ink))}
+.dayrow .chk.on{background:var(--ink);border-color:var(--ink)}
+.topbar{display:flex;gap:10px;align-items:center}
+.topbar #tohome{width:auto;margin-right:auto;padding:6px 12px}
+@media (max-width:1300px){.stbl .c-camp,.stbl col.c-camp{display:none}}
+@media (max-width:1100px){.stbl .c-pil,.stbl .c-veh,.stbl col.c-pil,.stbl col.c-veh{display:none}}
+@media (max-width:640px){#home{padding:14px 10px 40px}.stbl .c-com,.stbl .c-id,.stbl col.c-com,.stbl col.c-id{display:none}.stbl td,.stbl th{padding:8px 6px}}
+.stbl td,.stbl th{text-align:left;font-family:var(--body)}
+.stbl td.num,.stbl .best{font-family:var(--mono)}
+.stbl .dayrow td{text-align:left}
+.stbl td.c-com{white-space:nowrap;max-width:260px}
+.stbl .hide{display:none}
+#home .tw{overflow-x:auto}

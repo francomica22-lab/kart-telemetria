@@ -279,7 +279,21 @@ def build_data(paths, top=3, bands=None, log=print):
     out["circuito"].update(nombre=S[ref_id].get("venue"), lat=S[ref_id].get("lat0"), lon=S[ref_id].get("lon0"))
     out["optimo"] = {sid: optimal(R[R.ses == sid], S[sid], rap_by[sid]) for sid in S}
     out["setup_fields"] = [list(f) for f in setup_kart.FIELDS]
-    out["motor"] = motor.analyze(S, rap_by, ref_id, ref.length, corners, bands)
+    # motor: hace falta RPM en todas las tandas (hay MyChron sin el cable de RPM). Si falta o falla, el resto del
+    # analisis (curvas, vuelta optima, circuito) sigue igual y la interfaz avisa.
+    sin_rpm = []
+    for sid, s in S.items():
+        r = s["chans"]["rpm"][1]
+        ok = np.isfinite(r) & (r > 1500)
+        if ok.sum() < 200 or np.nanmax(np.where(ok, r, np.nan)) < 5000:
+            sin_rpm.append(sid)
+    out["motor"], out["sin_rpm"], out["motor_error"] = None, sin_rpm, None
+    if not sin_rpm:
+        try:
+            out["motor"] = motor.analyze(S, rap_by, ref_id, ref.length, corners, bands)
+        except Exception as e:
+            log(f"motor: {type(e).__name__}: {e}")
+            out["motor_error"] = f"{type(e).__name__}: {e}"
     out["track"] = {"x": ref.x[::6].round(1).tolist(), "y": ref.y[::6].round(1).tolist(), "L": ref.length}
 
     # resumen en consola

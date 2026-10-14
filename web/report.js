@@ -12,7 +12,10 @@
 
   function renderReport(D, root, opts = {}) {
     const IDS = D.sessions.map(s => s.id), REF = D.ref, S = Object.fromEntries(D.sessions.map(s => [s.id, s]));
-    const C = D.corners, M = D.motor, others = IDS.filter(i => i != REF);
+    // sin RPM (o si fallo el analisis de motor) todo lo demas funciona igual
+    const NOM = !D.motor, M = D.motor || { gears: {}, bands: [], sessions: Object.fromEntries(IDS.map(id => [id, {}])), compare: [] };
+    const C = D.corners, others = IDS.filter(i => i != REF);
+    const NOM_TXT = `<div class="panel"><h2>Sin datos de motor</h2><p class="ink2">${(D.sin_rpm || []).length ? `${D.sin_rpm.length == IDS.length ? "Estas tandas no tienen" : "La tanda " + D.sin_rpm.map(x => S[x] ? BT(x) : x).join(", ") + " no tiene"} RPM registradas (la MyChron necesita el cable de RPM conectado a la bobina o al cable de bujía). Sin RPM no se puede analizar motor, carburación ni transmisión; el resto del análisis funciona igual.` : "No se pudo analizar el motor de estas tandas. El resto del análisis funciona igual."}</p></div>`;
     const COL = Object.fromEntries(IDS.map((id, i) => [id, (opts.colors && opts.colors[id]) || PAL[i % 5]]));
     const BT = id => S[id].top[0].toFixed(3);   // identidad de la tanda: su mejor tiempo
     const multiDriver = new Set(D.sessions.map(s => (s.driver || "").trim().toUpperCase())).size > 1;
@@ -157,6 +160,7 @@
         ${sd.length || climaNote ? fold(`<span class="small">Cambios entre tandas${sd.length ? ` · ${sd.length} de setup` : ""}${climaNote ? " · clima" : ""}</span>`, `${sd.length ? `<p>${sd.map(esc).join("<br>")}</p>` : ""}${climaNote ? `<p>${climaNote.trim()}</p>` : ""}`, "subtle") : ""}`;
     }
     function motorConclusion(id) {
+      if (NOM) return `<p class="ink2">Sin datos de RPM: no se puede analizar el motor.</p>`;
       const c = M.compare.find(x => x.ses == id); if (!c) return "";
       const gs = Object.keys(M.gears).map(Number), tg = gs.find(g => M.gears[g] == Math.min(...gs.map(x => M.gears[x])));
       const d = c.dyno[tg] || c.dyno[String(tg)], gn = tg == 1 ? "1ra" : tg == 2 ? "2da" : tg + "ª";
@@ -313,6 +317,7 @@
       };
       const corto = t => t.replace(/\s*\([^)]*\)/g, "");
       const motorTile = id => {
+        if (NOM) return { ok: true, t: "Sin RPM", d: "la tanda no tiene RPM" };
         const fa = ((M.sessions[id] || {}).fallas || {}).grupos || [], f = fa.find(g => g.n >= 2 && g.curva);
         if (f) return { ok: false, t: "Posible falla", d: `curva ${f.curva}, vueltas ${f.vueltas.join(", ")}` };
         const c = M.compare.find(x => x.ses == id); if (!c) return { ok: true, t: "Sin comparar", d: "" };
@@ -529,6 +534,7 @@
     })();
 
     /* ================= MOTOR ================= */
+    if (NOM) P(2).innerHTML = NOM_TXT; else {
     const gears = Object.keys(M.gears).map(Number).sort();
     const top = gears.find(g => M.gears[g] == Math.min(...gears.map(x => M.gears[x])));
     const bandKeys = M.bands.map(b => b.join("-"));
@@ -600,9 +606,11 @@
         rowsDef.map(([n, fn]) => `<tr><td>${n}</td>${IDS.map(id => `<td>${fn(id)}</td>`).join("")}</tr>`).join("") + "</tbody>";
     })();
 
+    }
+
     /* ================= VUELTA OPTIMA · TRANSMISION · SENSORES · VIDEO ================= */
     P(4).innerHTML = KTX.optimoPane(ctx);
-    P(5).innerHTML = KTX.transPane(ctx); KTX.wireTrans(ctx, P(5));
+    if (NOM) P(5).innerHTML = NOM_TXT; else { P(5).innerHTML = KTX.transPane(ctx); KTX.wireTrans(ctx, P(5)); }
     P(6).innerHTML = KTX.sensorsPane(ctx); KTX.drawWater(ctx, P(6));
     P(7).innerHTML = KTX.videoPane(ctx); KTX.wireVideo(ctx, P(7));
     P(8).innerHTML = KTX.circuitPane(ctx); KTX.wireCircuit(ctx, P(8));

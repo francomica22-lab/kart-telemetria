@@ -28,25 +28,77 @@
     r.campeonato && `Campeonato: ${r.campeonato}`, r.tipo && `Tipo de sesión: ${r.tipo}`, `Vueltas: ${r.vueltas}`, r.archivo && `Archivo: ${r.archivo} (${r.kb} kB)`,
     r.comentario && `Comentario: ${r.comentario}`].filter(Boolean).join("\n");
 
-  function renderList() {
+  /* ---------- inicio: circuitos a la izquierda, tandas del circuito por dia a la derecha (como Race Studio) ---------- */
+  let circ = null, view = "home";
+  try { circ = localStorage.getItem("kt-circ"); } catch (e) { }
+  const pistaDe = r => r.pista || "Sin nombre de pista";
+  const sesionDe = r => { const c = (r.comentario || "").split(" · "); return { s: c[0] || "", resto: c.slice(1).join(" · ") }; };
+  const visibles = () => {
     const q = $("q").value.toLowerCase().trim(), only = $("onlylaps").checked;
-    const vis = rows.filter(r => (!only || r.vueltas > 0 || sel.includes(r.path)) &&
-      (!q || [r.id, r.fecha, r.hora, r.kart, r.pista, r.comentario, r.mejor, r.campeonato, r.piloto].join(" ").toLowerCase().includes(q)));
-    if (!vis.length) {
-      $("list").innerHTML = `<p class="muted pad">${rows.length ? "Ninguna tanda coincide." : "No hay archivos .xrk en esta carpeta."}</p>`; return;
-    }
+    return rows.filter(r => (!only || r.vueltas > 0 || sel.includes(r.path)) &&
+      (!q || [r.id, r.fecha, r.hora, r.kart, r.pista, r.comentario, r.mejor, r.campeonato, r.piloto, r.tipo].join(" ").toLowerCase().includes(q)));
+  };
+  const rango = rs => { const o = rs.map(r => r.orden).sort(), f = x => rs.find(r => r.orden == x).fecha; const a = f(o[0]), b = f(o[o.length - 1]); return a == b ? a : `${a.slice(0, 5)} – ${b}`; };
+  function renderList() {
+    const vis = visibles();
+    if (!vis.length) { $("list").innerHTML = `<p class="muted pad">${rows.length ? "Ninguna tanda coincide." : "No hay archivos .xrk en esta carpeta."}</p>`; renderHome(); return; }
     const groups = {};
-    for (const r of vis) { const k = r.fecha + "|" + r.pista; (groups[k] = groups[k] || []).push(r); }
-    $("list").innerHTML = Object.entries(groups).map(([k, rs]) => {
-      const [d, pista] = k.split("|"), best = rs.filter(r => r.mejor_n).map(r => r.mejor_n);
-      return `<div class="day"><div class="dhead"><span class="dd">${esc(d)}</span><span class="dp">${esc(pista)}</span><span class="dn">${rs.length} tanda${rs.length > 1 ? "s" : ""}${best.length ? ` · mejor ${Math.min(...best).toFixed(3)}` : ""}</span></div>` +
+    for (const r of vis) (groups[pistaDe(r)] = groups[pistaDe(r)] || []).push(r);
+    // el circuito mas reciente primero
+    const keys = Object.keys(groups).sort((a, b) => (groups[a].map(r => r.orden).sort().pop() < groups[b].map(r => r.orden).sort().pop() ? 1 : -1));
+    if (circ && !groups[circ] && circ != "*") circ = null;
+    if (!circ) circ = keys[0];
+    const item = (k, rs, label) => {
+      const best = rs.filter(r => r.mejor_n).map(r => r.mejor_n), nsel = rs.filter(r => sel.includes(r.path)).length;
+      return `<button class="circ-row${circ == k ? " on" : ""}" data-c="${esc(k)}"><span class="cn">${esc(label || k)}</span>${nsel ? `<span class="cs">${nsel}</span>` : ""}
+        <span class="cm">${esc(rango(rs))} · ${rs.length} tanda${rs.length > 1 ? "s" : ""}${best.length ? ` · mejor ${Math.min(...best).toFixed(3)}` : ""}</span></button>`;
+    };
+    $("list").innerHTML = `<div class="eyebrow pad-x">Circuitos</div>` + keys.map(k => item(k, groups[k])).join("") + (keys.length > 1 ? item("*", vis, "Todos los circuitos") : "");
+    renderHome();
+  }
+  function renderHome() {
+    const H = $("home"); if (!H) return;
+    if (!rows.length) { H.hidden = true; return; }
+    const vis = visibles().filter(r => circ == "*" || pistaDe(r) == circ);
+    const days = {};
+    for (const r of vis) (days[r.fecha] = days[r.fecha] || []).push(r);
+    const dk = Object.keys(days).sort((a, b) => (days[a][0].orden < days[b][0].orden ? 1 : -1));
+    // columnas vacias en todas las tandas (por ejemplo campeonato) no se muestran
+    const vacia = k => vis.every(r => !(k == "com" ? sesionDe(r).resto : r[k]));
+    const hid = { pil: vacia("piloto"), veh: vacia("kart"), camp: vacia("campeonato"), com: vacia("com") };
+    const cols = `<colgroup><col class="c-chk"><col class="c-hr"><col class="c-nv"><col class="c-best"><col class="c-ses"><col class="c-pil${hid.pil ? " hide" : ""}"><col class="c-veh${hid.veh ? " hide" : ""}"><col class="c-camp${hid.camp ? " hide" : ""}"><col class="c-com${hid.com ? " hide" : ""}"><col class="c-id"></colgroup>`;
+    const head = `<tr class="th"><th></th><th>Hora</th><th>Vueltas</th><th>Mejor</th><th>Sesión</th><th class="c-pil${hid.pil ? " hide" : ""}">Piloto</th><th class="c-veh${hid.veh ? " hide" : ""}">Vehículo</th><th class="c-camp${hid.camp ? " hide" : ""}">Campeonato</th><th class="c-com${hid.com ? " hide" : ""}">Comentario</th><th class="c-id">Tanda</th></tr>`;
+    const body = dk.map(d => {
+      const rs = days[d].sort((a, b) => (a.orden < b.orden ? 1 : -1)), best = rs.filter(r => r.mejor_n).map(r => r.mejor_n);
+      const allSel = rs.every(r => sel.includes(r.path));
+      return `<tbody><tr class="dayrow"><td><button class="chk${allSel ? " on" : ""}" data-day="${esc(d)}" title="${allSel ? "Quitar" : "Elegir"} todas las tandas del día" aria-pressed="${allSel}"></button></td>
+        <td colspan="9"><b>${esc(d)}</b> <span class="muted">· ${rs.length} tanda${rs.length > 1 ? "s" : ""}${best.length ? ` · mejor <b class="num">${Math.min(...best).toFixed(3)}</b>` : ""}${circ == "*" ? " · " + esc([...new Set(rs.map(pistaDe))].join(", ")) : ""}</span></td></tr>` +
         rs.map(r => {
-          const c = colorOf(r.path);
-          return `<div class="ses-row${c ? " sel" : ""}${r.vueltas ? "" : " nolap"}" data-p="${esc(r.path)}" style="--c:${c || "transparent"}" role="button" tabindex="0" aria-pressed="${!!c}" title="${esc(tip(r))}">
-            <span class="dot"></span><span class="best">${esc(label(r))}</span><span class="hr">${esc(r.hora)}</span><span class="nv">${r.vueltas ? r.vueltas + (r.vueltas == 1 ? " vuelta" : " vueltas") : ""}</span>
-            <span class="meta"><b>${esc(r.kart)}</b>${r.comentario ? " · " + esc(r.comentario) : ""}</span><span class="tid">#${esc(r.id)}</span></div>`;
-        }).join("") + `</div>`;
+          const c = colorOf(r.path), se = sesionDe(r), isBest = r.mejor_n && r.mejor_n == Math.min(...best);
+          return `<tr class="srow${c ? " sel" : ""}${r.vueltas ? "" : " nolap"}" data-p="${esc(r.path)}" style="--c:${c || "transparent"}" tabindex="0" aria-selected="${!!c}" title="${esc(tip(r))}">
+            <td><span class="chk${c ? " on" : ""}"></span></td><td class="num">${esc(r.hora)}</td><td class="num">${r.vueltas || "–"}</td>
+            <td class="num best${isBest ? " top" : ""}">${r.mejor_n ? r.mejor_n.toFixed(3) : "–"}</td>
+            <td class="ses">${esc(se.s || r.tipo || "")}</td><td class="c-pil${hid.pil ? " hide" : ""}">${esc(r.piloto)}</td><td class="c-veh${hid.veh ? " hide" : ""}">${esc(r.kart)}</td><td class="c-camp${hid.camp ? " hide" : ""}">${esc(r.campeonato)}</td>
+            <td class="c-com muted${hid.com ? " hide" : ""}">${esc(se.resto)}</td><td class="c-id num muted">#${esc(r.id)}</td></tr>`;
+        }).join("") + `</tbody>`;
     }).join("");
+    const all = circ == "*" ? visibles() : vis;
+    H.innerHTML = `<div class="home-h"><div><div class="eyebrow">${circ == "*" ? "Todos los circuitos" : "Circuito"}</div><h1>${esc(circ == "*" ? "Todas las tandas" : circ)}</h1>
+        <p class="muted">${all.length ? `${esc(rango(all))} · ${dk.length} día${dk.length > 1 ? "s" : ""} · ${all.length} tanda${all.length > 1 ? "s" : ""}` : "Sin tandas"}</p></div>
+        ${last ? `<button class="btn ghost" id="back-rep">Volver al análisis</button>` : ""}</div>
+      <p class="ink2 small">Tocá una tanda para analizarla, o varias para compararlas. Abajo a la izquierda está el botón para comparar.</p>
+      <div class="tw"><table class="stbl">${cols}<thead>${head}</thead>${body || `<tbody><tr><td colspan="10" class="muted">Ninguna tanda coincide.</td></tr></tbody>`}</table></div>`;
+    const br = $("back-rep"); if (br) br.addEventListener("click", () => show("report"));
+  }
+  function show(v) {
+    if (v == "home") renderHome();
+    view = v;
+    const hasRep = !!last;
+    $("empty").hidden = rows.length > 0 || (v == "report" && hasRep);
+    $("home").hidden = v != "home" || !rows.length;
+    $("report").hidden = v != "report" || !hasRep;
+    const t = $("tohome"); if (t) t.hidden = v != "report";
+    $("main").scrollTop = 0;
   }
 
   function renderTray() {
@@ -67,8 +119,21 @@
     renderList(); renderTray();
   }
 
-  $("list").addEventListener("click", e => { const row = e.target.closest(".ses-row"); if (row) toggle(row.dataset.p); });
-  $("list").addEventListener("keydown", e => { if ((e.key == "Enter" || e.key == " ") && e.target.classList.contains("ses-row")) { e.preventDefault(); toggle(e.target.dataset.p); } });
+  $("list").addEventListener("click", e => {
+    const c = e.target.closest(".circ-row"); if (!c) return;
+    circ = c.dataset.c; try { localStorage.setItem("kt-circ", circ); } catch (x) { }
+    renderList(); show("home");
+  });
+  $("home").addEventListener("click", e => {
+    const d = e.target.closest("[data-day]");
+    if (d) {
+      const rs = visibles().filter(r => r.fecha == d.dataset.day && (circ == "*" || pistaDe(r) == circ)), on = rs.every(r => sel.includes(r.path));
+      for (const r of rs) { const i = sel.indexOf(r.path); if (on && i >= 0) sel.splice(i, 1); else if (!on && i < 0) { if (sel.length >= 5) { toast("Máximo 5 tandas por comparación."); break; } sel.push(r.path); } }
+      renderList(); renderTray(); return;
+    }
+    const row = e.target.closest(".srow"); if (row) toggle(row.dataset.p);
+  });
+  $("home").addEventListener("keydown", e => { if ((e.key == "Enter" || e.key == " ") && e.target.classList.contains("srow")) { e.preventDefault(); toggle(e.target.dataset.p); } });
   $("tray").addEventListener("click", e => { const b = e.target.closest("[data-rm]"); if (b) toggle(b.dataset.rm); });
   $("q").addEventListener("input", renderList);
   $("onlylaps").addEventListener("change", renderList);
@@ -77,13 +142,13 @@
     $("list").innerHTML = `<p class="muted pad">Leyendo tandas…</p>`;
     try {
       const r = await api().list_sessions();
-      rows = r.rows;
+      rows = r.rows.slice().sort((a, b) => (a.orden < b.orden ? 1 : -1));
       if (!r.folder) { emptyList(); return; }
       const parts = r.folder.split(/[\\/]/).filter(Boolean);
       $("fname").textContent = parts[parts.length - 1] || r.folder;
       $("path").textContent = r.folder; $("pick").title = r.folder + " · tocá para cambiar";
       sel = sel.filter(p => rows.some(x => x.path == p));
-      renderList(); renderTray();
+      renderList(); renderTray(); show(last && view == "report" ? "report" : "home");
       if (r.errors && r.errors.length) toast(`${r.errors.length} archivo(s) no se pudieron leer.`, true);
     } catch (e) { $("list").innerHTML = `<p class="b pad">${esc(e.message || e)}</p>`; }
   }
@@ -188,7 +253,7 @@
       KT_status("Buscando el clima de cada tanda…");
       await addWeather(last);
       const colors = {}; sel.forEach((p, i) => { const r = rowOf(p); if (r) colors[r.id] = PAL[i % PAL.length]; });
-      $("empty").hidden = true; $("report").hidden = false;
+      show("report");
       renderReport(last, $("report"), { colors, saveSetup, onExport: exportReport, onShare: () => KTR.dialog(last, { onPdf: exportPdf }), onKartChange: () => window.KTS && KTS.share(last, { version: VERSION, web: IS_WEB }) });
       if (window.KTS) KTS.share(last, { version: VERSION, web: IS_WEB });   // resumen anonimo (si esta activado)
       $("main").scrollTop = 0;
@@ -199,10 +264,12 @@
   function topbar() {
     const tb = $("topbar");
     if (IS_WEB) {
-      tb.innerHTML = `<span class="ver">versión web ${esc(VERSION)}</span><a class="btn dl" href="${DOWNLOAD}">Descargar para Windows</a>`;
+      tb.innerHTML = `<button class="btn ghost" id="tohome" hidden>← Tandas</button><span class="ver">versión web ${esc(VERSION)}</span><a class="btn dl" href="${DOWNLOAD}">Descargar para Windows</a>`;
+      $("tohome").addEventListener("click", () => show("home"));
       return;
     }
-    tb.innerHTML = `<span class="ver">v${esc(VERSION)}</span>`;
+    tb.innerHTML = `<button class="btn ghost" id="tohome" hidden>← Tandas</button><span class="ver">v${esc(VERSION)}</span>`;
+    $("tohome").addEventListener("click", () => show("home"));
     api().check_update().then(u => {
       if (!u || !u.available) return;
       tb.insertAdjacentHTML("afterbegin", `<button class="upd" id="upd" title="Hay una versión nueva"><span class="bang">!</span>Actualización ${esc(u.version)}</button>`);
