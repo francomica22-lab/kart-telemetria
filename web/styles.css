@@ -504,3 +504,7 @@ p.foot{background:none;border:0;padding:0;max-width:none}
 .plan .pr b{font:700 24px var(--display)}
 .acctbox textarea{width:100%}
 .plan .lema{font:600 12px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--s2);margin-top:-6px}
+.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#fff;color:#1f1f1f;border-color:#dadce0;font-weight:600}
+.gbtn:hover{background:#f2f2f2}
+.or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
