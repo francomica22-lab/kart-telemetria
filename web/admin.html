@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Admin · Análisis Karting</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  html,body{height:auto}
+  body{overflow:auto}
+  .adm{max-width:1300px;margin:0 auto;padding:24px 20px 80px;display:grid;gap:16px}
+  .adm-h{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+  .kpi b{display:block;font:700 26px var(--display)}
+  .kpi span{font-size:12px;color:var(--muted)}
+  .atabs{display:flex;gap:6px;flex-wrap:wrap}
+  .atabs button{padding:8px 14px;border:1px solid var(--line);border-radius:4px;background:none;color:var(--ink2);cursor:pointer;font:inherit}
+  .atabs button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .tw{overflow-x:auto}
+  table.at{width:100%;border-collapse:collapse;font-size:13px}
+  table.at th{text-align:left;font:600 11px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg)}
+  table.at td{padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:top}
+  table.at td.wrap{white-space:normal;max-width:420px}
+  table.at td,table.at th{text-align:left}
+  table.at td{font:400 13px var(--body)}
+  table.at td.num{font-family:var(--mono)}
+  .row .btn,.adm-h .btn,table.at .btn{width:auto}
+  .tag{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;border:1px solid var(--line)}
+  .tag.g{color:var(--good);border-color:color-mix(in srgb,var(--good) 50%,transparent)}
+  .tag.b{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 50%,transparent)}
+  .tag.w{color:var(--warn)}
+  .login{max-width:380px;margin:80px auto;display:grid;gap:12px}
+  .login input{width:100%}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+  .row label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+  details.js pre{white-space:pre-wrap;font-size:11px;max-width:600px}
+</style>
+</head>
+<body>
+<div id="app"><div class="login"><p class="ink2">Cargando…</p></div></div>
+<script src="cuenta.js"></script>
+<script>
+(() => {
+  const URL = "https://zbesblxiezcfurswanev.supabase.co", KEY = "sb_publishable_HRIpZ4BfWemVZ8TNA37-EQ_tKN1joRG";
+  const app = document.getElementById("app");
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const f = d => d ? new Date(d).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "–";
+  const fd = d => d ? new Date(d).toLocaleDateString("es-AR") : "–";
+  const mb = b => b == null ? "–" : b > 1048576 ? (b / 1048576).toFixed(1) + " MB" : (b / 1024).toFixed(1) + " kB";
+  const PRECIO = KTA.PRECIOS;
+  async function rpc(name, body) {
+    const t = await KTA.token(); if (!t) throw new Error("sesión vencida");
+    const r = await fetch(`${URL}/rest/v1/rpc/${name}`, { method: "POST", headers: { apikey: KEY, Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error((j && j.message) || r.status);
+    return j;
+  }
+  function login(err) {
+    app.innerHTML = `<form class="login" id="lf"><div class="eyebrow">Análisis Karting</div><h1>Administración</h1>
+      <input type="email" id="em" placeholder="Mail" autocomplete="email" required><input type="password" id="pw" placeholder="Contraseña" autocomplete="current-password" required>
+      <button class="btn primary">Ingresar</button><p class="small b">${esc(err || "")}</p></form>`;
+    document.getElementById("lf").addEventListener("submit", async e => {
+      e.preventDefault();
+      try { await KTA.ingresar(document.getElementById("em").value.trim(), document.getElementById("pw").value); cargar(); } catch (er) { login(er.message); }
+    });
+  }
+  let D = null, tab = "usuarios";
+  async function cargar() {
+    if (!KTA.estado().logueado) return login();
+    app.innerHTML = `<div class="login"><p class="ink2">Cargando datos…</p></div>`;
+    try { D = await rpc("admin_resumen"); } catch (e) { return login(/autorizado/.test(e.message) ? "Esta cuenta no es administradora (o el mail no está confirmado)." : "Error: " + e.message); }
+    pintar();
+  }
+  function pintar() {
+    const U = D.usuarios, ahora = Date.now();
+    const vig = u => u.plan && u.estado != "vencida" && Date.parse(u.vence) > ahora;
+    const pagos = U.filter(u => vig(u) && u.estado == "activa" && ["mercadopago", "lemonsqueezy"].includes(u.proveedor));
+    const mrr = mon => pagos.filter(u => (u.proveedor == "mercadopago") == (mon == "ARS")).reduce((a, u) => a + (PRECIO[mon][u.plan][u.periodo || "mensual"] / (u.periodo == "anual" ? 12 : 1)), 0);
+    const pend = D.pedidos_baja.filter(p => p.estado == "pendiente").length;
+    const kpi = (v, t) => `<div class="kpi"><b>${v}</b><span>${t}</span></div>`;
+    app.innerHTML = `<div class="adm">
+      <div class="adm-h"><div><div class="eyebrow">Análisis Karting</div><h1>Administración</h1><p class="small muted">Datos al ${f(D.generado)}</p></div>
+        <div class="row"><button class="btn" id="rf">Actualizar</button><button class="btn" id="out">Salir</button></div></div>
+      <div class="kpis">${kpi(U.length, "usuarios")}${kpi(U.filter(u => u.estado == "prueba" && vig(u)).length, "en prueba")}${kpi(pagos.length, "suscripciones pagas")}
+        ${kpi(U.filter(u => u.proveedor == "manual" && vig(u)).length, "cortesía")}${kpi("$" + Math.round(mrr("ARS")).toLocaleString("es-AR"), "ingreso mensual ARS (estimado)")}${kpi("USD " + Math.round(mrr("USD")), "ingreso mensual USD (estimado)")}
+        ${kpi(pend, "pedidos de baja pendientes")}${kpi(mb(D.base_bytes), "base de datos (límite gratis 500 MB)")}</div>
+      <div class="atabs">${[["usuarios", "Usuarios y suscripciones"], ["bajas", `Bajas${pend ? " (" + pend + ")" : ""}`], ["circuitos", "Circuitos"], ["tandas", "Tandas (anónimas)"], ["compartidos", "Links compartidos"], ["espacio", "Almacenamiento"]]
+        .map(([k, t]) => `<button data-t="${k}" class="${tab == k ? "on" : ""}">${t}</button>`).join("")}</div>
+      <div id="tb"></div></div>`;
+    document.getElementById("rf").addEventListener("click", cargar);
+    document.getElementById("out").addEventListener("click", async () => { await KTA.salir(); login(); });
+    app.querySelectorAll(".atabs button").forEach(b => b.addEventListener("click", () => { tab = b.dataset.t; pintar(); }));
+    const tb = document.getElementById("tb");
+    const tabla = (cols, rows) => `<div class="tw"><table class="at"><thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>${rows.join("") || `<tr><td colspan="${cols.length}" class="muted">Sin datos</td></tr>`}</tbody></table></div>`;
+    if (tab == "usuarios") {
+      const est = u => !u.plan ? `<span class="tag">sin suscripción</span>` : !vig(u) ? `<span class="tag b">vencida</span>` : u.estado == "prueba" ? `<span class="tag w">prueba</span>` : u.estado == "cancelada" ? `<span class="tag w">cancelada</span>` : `<span class="tag g">activa</span>`;
+      tb.innerHTML = `<div class="panel"><h2>Dar un plan a mano</h2><p class="small ink2">Para amigos, cortesías o para resolver un problema de pago. Reemplaza la suscripción actual de esa cuenta (no cancela cobros en Mercado Pago o Lemon Squeezy).</p>
+        <form class="row" id="dp"><label>Mail<input type="email" id="dp-em" required></label><label>Plan<select id="dp-pl"><option value="pro">Pro</option><option value="simple">Simple</option></select></label>
+        <label>Días<input type="number" id="dp-d" value="365" min="1" max="3650" style="width:90px"></label><button class="btn primary">Dar plan</button><span class="small" id="dp-m"></span></form></div>` +
+        tabla(["Mail", "Creada", "Último ingreso", "Mail confirmado", "Plan", "Estado", "Vence", "Período", "Pago"], U.map(u => `<tr><td>${esc(u.email)}</td><td>${fd(u.creado)}</td><td>${f(u.ultimo_ingreso)}</td><td>${u.confirmado ? "sí" : "<span class='tag b'>no</span>"}</td>
+          <td>${esc(u.plan || "–")}</td><td>${est(u)}</td><td>${fd(u.vence)}</td><td>${esc(u.periodo || "–")}</td><td>${esc(u.proveedor || "–")}</td></tr>`));
+      document.getElementById("dp").addEventListener("submit", async e => {
+        e.preventDefault(); const m = document.getElementById("dp-m");
+        try { await rpc("admin_dar_plan", { p_email: document.getElementById("dp-em").value.trim(), p_plan: document.getElementById("dp-pl").value, p_dias: +document.getElementById("dp-d").value }); m.textContent = "Listo."; await cargar(); }
+        catch (er) { m.className = "small b"; m.textContent = er.message; }
+      });
+    } else if (tab == "bajas") {
+      tb.innerHTML = `<p class="small ink2">Arrepentimiento: devolver el pago desde el panel de Mercado Pago o Lemon Squeezy y avisar por mail; después marcar como resuelto. Plazo: 10 días.</p>` +
+        tabla(["Fecha", "Mail", "Tipo", "Comentario", "Medio", "Estado", ""], D.pedidos_baja.map(p => `<tr><td>${f(p.creado)}</td><td>${esc(p.email)}</td><td>${p.tipo == "arrepentimiento" ? "<span class='tag b'>arrepentimiento</span>" : "baja"}</td>
+          <td class="wrap">${esc(p.motivo || "")}</td><td>${esc(p.proveedor || "–")} ${esc(p.proveedor_ref || "")}</td><td>${p.estado == "pendiente" ? "<span class='tag w'>pendiente</span>" : "<span class='tag g'>resuelto</span>"}</td>
+          <td>${p.estado == "pendiente" ? `<button class="btn small" data-res="${p.id}">Marcar resuelto</button>` : ""}</td></tr>`));
+      tb.querySelectorAll("[data-res]").forEach(b => b.addEventListener("click", async () => { b.disabled = true; await rpc("admin_resolver_pedido", { p_id: +b.dataset.res }); cargar(); }));
+    } else if (tab == "circuitos") {
+      tb.innerHTML = tabla(["Circuito", "Tandas", "Equipos", "Mejor tiempo", "Desde", "Hasta", "Categorías"], D.circuitos.map(c => `<tr><td>${esc(c.circuito)}</td><td>${c.tandas}</td><td>${c.equipos}</td>
+        <td class="num">${c.mejor != null ? (+c.mejor).toFixed(3) : "–"}</td><td>${fd(c.desde)}</td><td>${fd(c.hasta)}</td><td>${esc((c.categorias || []).join(", "))}</td></tr>`));
+    } else if (tab == "tandas") {
+      tb.innerHTML = `<p class="small ink2">Resúmenes anónimos enviados por la app (últimos 500). No están vinculados a ninguna cuenta.</p>` +
+        tabla(["Recibido", "Circuito", "Fecha", "Hora", "Categoría", "Chasis", "Motor", "Mejor", "Prom.", "Vueltas", "HP", "Fallas", "Versión", "Equipo", "Setup / clima"], D.envios.map(e => `<tr><td>${f(e.created_at)}</td><td>${esc(e.circuito)}</td><td>${fd(e.fecha)}</td><td>${esc(e.hora || "")}</td>
+          <td>${esc(e.categoria || "")}</td><td>${esc(e.chasis || "")}</td><td>${esc(e.motor || "")}</td><td class="num">${e.mejor_tiempo != null ? (+e.mejor_tiempo).toFixed(3) : "–"}</td><td class="num">${e.promedio != null ? (+e.promedio).toFixed(3) : "–"}</td>
+          <td>${e.vueltas ?? ""}</td><td>${e.potencia_hp != null ? (+e.potencia_hp).toFixed(1) : ""}</td><td>${e.fallas_motor || ""}</td><td>${esc(e.app_version || "")} ${esc(e.plataforma || "")}</td><td class="muted">${esc(String(e.dispositivo || "").slice(0, 8))}</td>
+          <td><details class="js"><summary class="small">ver</summary><pre>${esc(JSON.stringify({ setup: e.setup, clima: e.clima }, null, 1))}</pre></details></td></tr>`));
+    } else if (tab == "compartidos") {
+      const C = D.compartidos;
+      tb.innerHTML = `<p class="small ink2">${C.total} links activos · ${C.vistas} vistas · ${mb(C.bytes)}. Vencen solos a los 30 días.</p>` +
+        tabla(["Creado", "Reporte", "Vistas", "Tamaño", "Vence", ""], C.lista.map(c => `<tr><td>${f(c.creado)}</td><td>${esc(c.titulo || "")}</td><td>${c.vistas}</td><td>${mb(c.bytes)}</td><td>${fd(c.vence)}</td>
+          <td><a href="ver.html#${esc(c.id)}" target="_blank" rel="noopener">abrir</a></td></tr>`));
+    } else if (tab == "espacio") {
+      tb.innerHTML = `<p class="small ink2">La base completa ocupa ${mb(D.base_bytes)}. Los archivos de telemetría de los usuarios no se guardan en el servidor: quedan en sus equipos.</p>` +
+        tabla(["Tabla", "Filas (aprox.)", "Tamaño"], D.tablas.map(t => `<tr><td>${esc(t.tabla)}</td><td>${Math.max(0, t.filas)}</td><td>${mb(t.bytes)}</td></tr>`));
+    }
+  }
+  cargar();
+})();
+</script>
+</body>
+</html>

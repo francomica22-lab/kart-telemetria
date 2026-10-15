@@ -21,8 +21,8 @@
   function pickFiles() {
     return new Promise(resolve => {
       const inp = document.createElement("input");
-      inp.type = "file"; inp.multiple = true; inp.webkitdirectory = true; inp.accept = ".xrk";
-      inp.addEventListener("change", () => resolve([...inp.files].filter(f => f.name.toLowerCase().endsWith(".xrk"))));
+      inp.type = "file"; inp.multiple = true; inp.webkitdirectory = true; inp.accept = ".xrk,.xrz";
+      inp.addEventListener("change", () => resolve([...inp.files].filter(f => /\.xr[kz]$/i.test(f.name))));
       inp.click();
     });
   }

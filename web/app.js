@@ -41,7 +41,7 @@
   const rango = rs => { const o = rs.map(r => r.orden).sort(), f = x => rs.find(r => r.orden == x).fecha; const a = f(o[0]), b = f(o[o.length - 1]); return a == b ? a : `${a.slice(0, 5)} – ${b}`; };
   function renderList() {
     const vis = visibles();
-    if (!vis.length) { $("list").innerHTML = `<p class="muted pad">${rows.length ? "Ninguna tanda coincide." : "No hay archivos .xrk en esta carpeta."}</p>`; renderHome(); return; }
+    if (!vis.length) { $("list").innerHTML = `<p class="muted pad">${rows.length ? "Ninguna tanda coincide." : "No hay archivos .xrk ni .xrz en esta carpeta."}</p>`; renderHome(); return; }
     const groups = {};
     for (const r of vis) (groups[pistaDe(r)] = groups[pistaDe(r)] || []).push(r);
     // el circuito mas reciente primero
@@ -172,7 +172,7 @@
     const collect = async items => {
       const out = [];
       const walk = entry => new Promise(res => {
-        if (entry.isFile) entry.file(f => { if (f.name.toLowerCase().endsWith(".xrk")) out.push(f); res(); }, () => res());
+        if (entry.isFile) entry.file(f => { if (/\.xr[kz]$/i.test(f.name)) out.push(f); res(); }, () => res());
         else if (entry.isDirectory) { const rd = entry.createReader(); const all = []; const next = () => rd.readEntries(async es => { if (!es.length) { for (const x of all) await walk(x); res(); } else { all.push(...es); next(); } }, () => res()); next(); }
         else res();
       });
@@ -184,7 +184,7 @@
     document.addEventListener("drop", async e => {
       e.preventDefault(); document.body.classList.remove("drop");
       const files = await collect([...e.dataTransfer.items]);
-      if (files.length) pick(files); else toast("No encontré archivos .xrk en lo que soltaste.", true);
+      if (files.length) pick(files); else toast("No encontré archivos .xrk o .xrz en lo que soltaste.", true);
     });
   }
   $("reload").addEventListener("click", scan);

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Análisis Karting · Telemetría de karting, curva por curva</title>
+<meta name="description" content="Analizá tus tandas de AiM MyChron curva por curva: dónde perdés tiempo, si es manejo o agarre, motor y carburación. Programa para Windows y versión web. 7 días gratis.">
+<meta property="og:title" content="Análisis Karting · Telemetría de karting, curva por curva">
+<meta property="og:description" content="Dónde perdés tiempo, si es manejo o agarre, motor y carburación. 7 días gratis.">
+<meta property="og:image" content="img/simple.webp">
+<link rel="stylesheet" href="styles.css">
+<style>
+  html,body{height:auto}
+  body{overflow:auto}
+  a{color:inherit}
+  .wrap{max-width:1160px;margin:0 auto;padding:0 20px}
+  header.top{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  header.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;height:60px}
+  .logo{font:700 17px var(--display);letter-spacing:.08em;text-transform:uppercase;text-decoration:none}
+  .logo span{color:var(--s2)}
+  nav.links{display:flex;gap:18px;align-items:center;font-size:14px}
+  nav.links a{text-decoration:none;color:var(--ink2)}
+  nav.links a:hover{color:var(--ink)}
+  .cta{display:inline-block;padding:11px 18px;border-radius:6px;font:600 14px var(--display);letter-spacing:.06em;text-transform:uppercase;text-decoration:none;border:1px solid var(--line)}
+  .cta.pri{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .cta.sm{padding:7px 12px;font-size:12px}
+  .lhero{padding:72px 0 40px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:40px;align-items:center}
+  .lhero h1{font-size:clamp(34px,5vw,56px);line-height:1.04;letter-spacing:-.01em}
+  .lhero h1 em{font-style:normal;color:var(--s2)}
+  .lhero p.lead{font-size:18px;line-height:1.55;color:var(--ink2);margin:18px 0 26px;max-width:48ch}
+  .lhero .ctas{display:flex;gap:10px;flex-wrap:wrap}
+  .lhero .fine{font-size:13px;color:var(--muted);margin-top:12px}
+  .shot{border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 30px 80px -30px rgba(0,0,0,.7);background:var(--panel)}
+  .shot img{display:block;width:100%;height:auto}
+  section{padding:56px 0;border-top:1px solid var(--line)}
+  section h2{font-size:clamp(26px,3.4vw,36px);margin-bottom:10px}
+  section p.sub{color:var(--ink2);font-size:16px;margin-bottom:28px}
+  .feats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  .feat{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px}
+  .feat h3{font-size:17px;margin-bottom:6px}
+  .feat p{color:var(--ink2);font-size:14px;line-height:1.55}
+  .feat .k{font:700 12px var(--display);letter-spacing:.1em;color:var(--s2);margin-bottom:8px;display:block}
+  .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:36px;align-items:center}
+  .split ul{margin:12px 0 0;padding-left:18px;color:var(--ink2);display:grid;gap:8px;font-size:15px}
+  .phone{max-width:300px;margin:0 auto;border-radius:22px;border:6px solid #222a35}
+  .compat{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+  .compat div{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px}
+  .compat b{display:block;font:600 16px var(--display)}
+  .compat span{font-size:13px;color:var(--muted)}
+  .compat .ok span{color:var(--good)}
+  .pt{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+  .pt .seg{display:flex;gap:4px}
+  .pt button{padding:8px 14px;border:1px solid var(--line);border-radius:5px;background:none;color:var(--ink2);cursor:pointer;font:inherit}
+  .pt button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+  .prices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  .price{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px;display:grid;gap:12px;align-content:start}
+  .price.rec{border-color:var(--ink2)}
+  .price h3{font-size:22px}
+  .price .amt{font:700 34px var(--display)}
+  .price .amt small{font:400 14px var(--body);color:var(--muted)}
+  .price ul{list-style:none;margin:0;padding:0;display:grid;gap:7px;font-size:14px;color:var(--ink2)}
+  .price li.no{color:var(--muted);text-decoration:line-through}
+  .faq details{border-bottom:1px solid var(--line);padding:14px 0}
+  .faq summary{cursor:pointer;font:600 16px var(--display);letter-spacing:.02em}
+  .faq p{color:var(--ink2);margin-top:8px;font-size:15px;line-height:1.6}
+  footer{border-top:1px solid var(--line);padding:30px 0 50px;color:var(--muted);font-size:13px}
+  footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  footer nav{display:flex;gap:16px;flex-wrap:wrap}
+  .arrep{display:inline-block;padding:6px 12px;border:1px solid var(--ink2);border-radius:5px;color:var(--ink);text-decoration:none;font-weight:600}
+  .cta{white-space:nowrap}
+  @media (max-width:520px){.logo{font-size:14px;letter-spacing:.04em}header.top .cta.sm{padding:6px 10px;font-size:11px}}
+  @media (max-width:900px){.lhero,.split{grid-template-columns:1fr}.feats,.prices{grid-template-columns:1fr}nav.links a.hide-m{display:none}.lhero{padding-top:40px}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="logo" href="./">Análisis <span>Karting</span></a>
+  <nav class="links"><a class="hide-m" href="#funciones">Funciones</a><a class="hide-m" href="#precios">Precios</a><a class="hide-m" href="#preguntas">Preguntas</a>
+    <a class="cta sm pri" href="app.html">Abrir la app</a></nav>
+</div></header>
+
+<main>
+<div class="wrap lhero">
+  <div>
+    <div class="eyebrow">Telemetría de karting · AiM MyChron</div>
+    <h1>Sabé en qué curva <em>perdés tiempo</em> y por qué.</h1>
+    <p class="lead">Cargá tus tandas y en segundos te dice cuánto perdés, en qué curva, si es manejo o agarre, y cómo anduvo el motor. Sin planillas, en castellano y pensado para pilotos y mecánicos.</p>
+    <div class="ctas"><a class="cta pri" href="app.html">Probá 7 días gratis</a><a class="cta" href="https://github.com/francomica22-lab/kart-telemetria/releases/latest/download/AnalisisKarting-windows.zip">Descargar para Windows</a></div>
+    <p class="fine">Sin tarjeta para la prueba. Tus archivos no salen de tu computadora.</p>
+  </div>
+  <div class="shot"><img src="img/simple.webp" alt="Análisis simple: +0,21 s por vuelta, se perdió por manejo, mapa del circuito con las curvas donde se pierde y qué hacer" width="1197" height="1004"></div>
+</div>
+
+<section id="funciones"><div class="wrap">
+  <h2>Todo lo que te dice una tanda</h2>
+  <p class="sub">Elegí una tanda para ver tu vuelta óptima, o varias para compararlas.</p>
+  <div class="feats">
+    <div class="feat"><span class="k">01 · CURVAS</span><h3>Dónde perdés</h3><p>Curva por curva y por sectores: tiempo, velocidad en el vértice, frenada, aceleración y línea. Te marca las 3 curvas que más te cuestan.</p></div>
+    <div class="feat"><span class="k">02 · DIAGNÓSTICO</span><h3>¿Manejo o agarre?</h3><p>Compara la G lateral que usaste contra la que el kart te dio en la tanda: si fue el piloto, las gomas o el setup.</p></div>
+    <div class="feat"><span class="k">03 · VUELTA ÓPTIMA</span><h3>Lo que ya hiciste bien</h3><p>Junta tus mejores curvas y te dice qué hiciste distinto en cada una para que lo repitas.</p></div>
+    <div class="feat"><span class="k">04 · MOTOR</span><h3>Potencia y fallas</h3><p>Curva de potencia en HP, comparación entre tandas con margen de error y detección de cortes de encendido por curva.</p></div>
+    <div class="feat"><span class="k">05 · CARBURACIÓN</span><h3>Gordo, fino o en punto</h3><p>Tres indicios sin sensor de escape, cruzados con lo que sentiste. Te sugiere el chicler según el clima del día.</p></div>
+    <div class="feat"><span class="k">06 · COMPARTIR</span><h3>Link, QR y PDF</h3><p>Mostrale el análisis a tu mecánico o a tu equipo en el celular, aunque no estén en la pista.</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap split">
+  <div class="shot"><img src="img/tandas.webp" alt="Lista de tandas por circuito y por día, con hora, vueltas, mejor tiempo y sesión" width="970" height="962" loading="lazy"></div>
+  <div><h2>Tus tandas, ordenadas como en la pista</h2>
+    <p class="ink2">Elegís la carpeta donde guardás los archivos de la MyChron y la app arma la lista por circuito y por día, con la sesión (manga, prefinal, final) y el comentario de cada tanda.</p>
+    <ul><li>Setup, clima y temperatura de agua en cada tanda.</li><li>Transmisión: qué corona te deja en las RPM justas al final de la recta.</li><li>Video del onboard sincronizado con la telemetría.</li></ul></div>
+</div></section>
+
+<section><div class="wrap split">
+  <div><h2>Carburación sin sensor de escape</h2>
+    <p class="ink2">Contale cómo sentiste el motor y si detonó. La app lo cruza con los datos (dónde llega el pico de RPM, cuánto estira arriba, el clima y la temperatura de agua) y te propone el cambio concreto: números de chicler, aguja, o vueltas de alta y baja en carburadores a membrana.</p></div>
+  <div class="shot"><img src="img/carburacion.webp" alt="Sección de carburación con los tres indicios y la sugerencia de cambio" width="1197" height="996" loading="lazy"></div>
+</div></section>
+
+<section><div class="wrap split">
+  <div><img class="phone" src="img/celular.webp" alt="El análisis abierto en un celular" width="471" height="1011" loading="lazy"></div>
+  <div><h2>En la PC o en el celular</h2>
+    <p class="ink2">Programa para Windows que funciona sin internet en el box, y versión web que corre en el navegador. Compartí cualquier análisis con un QR y abrilo en el teléfono.</p>
+    <h3 style="margin-top:22px">Cronómetros</h3>
+    <div class="compat" style="margin-top:10px"><div class="ok"><b>AiM MyChron</b><span>Compatible (.xrk)</span></div><div><b>Unipro</b><span>Próximamente</span></div><div><b>Alfano</b><span>Próximamente</span></div></div></div>
+</div></section>
+
+<section id="precios"><div class="wrap">
+  <h2>Precios</h2>
+  <p class="sub">7 días gratis con todo. Después elegís el plan. Cancelás cuando quieras desde la app.</p>
+  <div class="pt"><div class="seg" role="group" aria-label="Período"><button data-per="mensual">Mensual</button><button data-per="anual">Anual · 2 meses gratis</button></div>
+    <div class="seg" role="group" aria-label="Moneda"><button data-mon="ARS">Pesos</button><button data-mon="USD">Dólares</button></div></div>
+  <div class="prices">
+    <div class="price"><h3>Prueba</h3><div class="amt">Gratis <small>7 días</small></div><ul><li>Todo lo del plan Pro</li><li>Sin tarjeta</li><li>No se renueva sola</li></ul><a class="cta" href="app.html">Empezar</a></div>
+    <div class="price"><h3>Simple</h3><div class="amt" data-pr="simple"></div><ul><li>Analizar y comparar tandas</li><li>Análisis simple: dónde perdés y qué hacer</li><li>Vuelta óptima y circuito</li><li>Exportar a PDF</li><li class="no">Análisis detallado</li><li class="no">Motor, carburación y setup</li><li class="no">Compartir por link y QR</li></ul><a class="cta" href="app.html">Elegir Simple</a></div>
+    <div class="price rec"><h3>Pro</h3><div class="amt" data-pr="pro"></div><ul><li>Todo lo del plan Simple</li><li>Análisis detallado: curvas, sectores, G</li><li>Motor, carburación y transmisión</li><li>Setup por tanda y video sincronizado</li><li>Compartir por link y QR</li></ul><a class="cta pri" href="app.html">Elegir Pro</a></div>
+  </div>
+  <p class="small muted" style="margin-top:14px" id="pnota"></p>
+</div></section>
+
+<section id="preguntas" class="faq"><div class="wrap">
+  <h2>Preguntas</h2>
+  <details><summary>¿Mis archivos se suben a algún lado?</summary><p>No. El análisis se hace en tu computadora o en tu navegador. Solo viaja un resumen anónimo de cada tanda (circuito, kart, mejor tiempo) que podés desactivar, y la copia del reporte si vos elegís compartirlo por link.</p></details>
+  <details><summary>¿Necesito internet en la pista?</summary><p>El programa de Windows funciona sin internet. Solo necesita conectarse una vez cada 7 días para confirmar tu suscripción.</p></details>
+  <details><summary>¿Qué cronómetros funcionan?</summary><p>Hoy, los archivos .xrk de AiM MyChron (los que descarga Race Studio 3). Estamos sumando Unipro y Alfano.</p></details>
+  <details><summary>¿Cómo cancelo?</summary><p>Desde la app: Tu cuenta → Dar de baja la suscripción. Seguís usando lo que pagaste hasta el final del período y no se te cobra más. Tenés además 10 días desde el pago para arrepentirte y que te devolvamos todo.</p></details>
+  <details><summary>¿Cómo pago?</summary><p>En Argentina, en pesos con Mercado Pago (tarjeta de crédito, débito o dinero en cuenta). Desde otros países, en dólares con tarjeta internacional.</p></details>
+  <details><summary>¿Las sugerencias de carburación son seguras?</summary><p>Son orientativas: salen de los datos y de lo que contás que sentiste. Confirmalas siempre mirando la bujía y la cabeza del pistón, y con tu mecánico. Una mezcla demasiado fina puede romper el motor.</p></details>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <div>© 2026 Análisis Karting · Franco Mica · <a href="mailto:franco.mica22@gmail.com">franco.mica22@gmail.com</a></div>
+  <nav><a href="terminos.html">Términos y condiciones</a><a href="privacidad.html">Privacidad</a><a href="https://www.argentina.gob.ar/produccion/defensadelconsumidor" target="_blank" rel="noopener">Defensa del Consumidor</a><a class="arrep" href="arrepentimiento.html">Botón de arrepentimiento</a></nav>
+</div></footer>
+<script>
+(() => {
+  const P = { ARS: { simple: { mensual: 9900, anual: 99000 }, pro: { mensual: 19900, anual: 199000 } }, USD: { simple: { mensual: 9, anual: 90 }, pro: { mensual: 19, anual: 190 } } };
+  let per = "anual", mon = /Argentina|Buenos_Aires|Cordoba|Mendoza|Salta|Jujuy|Tucuman|Catamarca|La_Rioja|San_Juan|San_Luis|Rio_Gallegos|Ushuaia/.test((Intl.DateTimeFormat().resolvedOptions() || {}).timeZone || "") ? "ARS" : "USD";
+  const fmt = v => mon == "ARS" ? "$" + v.toLocaleString("es-AR") : "USD " + v;
+  const pintar = () => {
+    document.querySelectorAll("[data-per]").forEach(b => b.classList.toggle("on", b.dataset.per == per));
+    document.querySelectorAll("[data-mon]").forEach(b => b.classList.toggle("on", b.dataset.mon == mon));
+    document.querySelectorAll("[data-pr]").forEach(el => { const v = P[mon][el.dataset.pr][per]; el.innerHTML = `${fmt(v)} <small>/ ${per == "anual" ? "año" : "mes"}</small>`; });
+    document.getElementById("pnota").textContent = (mon == "ARS" ? "Precios finales en pesos, con Mercado Pago." : "Precios en dólares; los impuestos de tu país se agregan al pagar.") + (per == "anual" ? " El plan anual equivale a 10 meses." : "");
+  };
+  document.querySelectorAll("[data-per]").forEach(b => b.addEventListener("click", () => { per = b.dataset.per; pintar(); }));
+  document.querySelectorAll("[data-mon]").forEach(b => b.addEventListener("click", () => { mon = b.dataset.mon; pintar(); }));
+  pintar();
+})();
+</script>
+</body>
+</html>

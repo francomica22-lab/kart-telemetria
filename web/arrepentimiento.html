@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Botón de arrepentimiento · Análisis Karting</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  html,body{height:auto}
+  body{overflow:auto}
+  .doc{max-width:620px;margin:0 auto;padding:40px 20px 80px;display:grid;gap:16px}
+  .doc h1{font-size:32px}
+  .doc p{font-size:15px;line-height:1.6;color:var(--ink2);max-width:none}
+  .doc b{color:var(--ink)}
+  .doc a{color:var(--ink)}
+  form{display:grid;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px}
+  label{display:grid;gap:6px}
+  input,textarea,select{width:100%}
+</style>
+</head>
+<body>
+<main class="doc">
+  <div class="eyebrow"><a href="./" style="text-decoration:none">Análisis Karting</a></div>
+  <h1>Botón de arrepentimiento y de baja</h1>
+  <p>Tenés <b>10 días corridos desde el pago</b> para arrepentirte de la suscripción sin dar motivos: la cancelamos y te devolvemos todo lo cobrado por el mismo medio de pago (Ley 24.240, art. 34, y Res. 424/2020). También podés pedir acá la <b>baja</b> en cualquier momento.</p>
+  <p>Lo más rápido es hacerlo desde la app: <b>Tu cuenta → Botón de arrepentimiento</b> (o <b>Dar de baja la suscripción</b>), y queda hecho en el momento. Si no podés entrar, completá este formulario:</p>
+  <form id="f">
+    <label><span>Mail de tu cuenta</span><input type="email" id="em" required maxlength="200" autocomplete="email"></label>
+    <label><span>Qué querés hacer</span><select id="tipo"><option value="arrepentimiento">Arrepentirme (10 días) y pedir la devolución</option><option value="baja">Dar de baja la suscripción</option></select></label>
+    <label><span>Comentario (opcional)</span><textarea id="mot" rows="3" maxlength="500"></textarea></label>
+    <button class="btn primary" id="go">Enviar pedido</button>
+    <p class="small" id="msg" role="status"></p>
+  </form>
+  <p class="small muted">Te confirmamos por mail con el número de trámite en menos de 48 horas. Consultas: <a href="mailto:franco.mica22@gmail.com">franco.mica22@gmail.com</a>. <a href="terminos.html">Términos y condiciones</a></p>
+</main>
+<script>
+(() => {
+  const URL = "https://zbesblxiezcfurswanev.supabase.co", KEY = "sb_publishable_HRIpZ4BfWemVZ8TNA37-EQ_tKN1joRG";
+  const f = document.getElementById("f"), msg = document.getElementById("msg");
+  f.addEventListener("submit", async e => {
+    e.preventDefault();
+    const go = document.getElementById("go"); go.disabled = true; msg.className = "small ink2"; msg.textContent = "Enviando…";
+    try {
+      const r = await fetch(URL + "/rest/v1/pedidos_baja", { method: "POST", headers: { apikey: KEY, "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ email: document.getElementById("em").value.trim(), tipo: document.getElementById("tipo").value, motivo: document.getElementById("mot").value.slice(0, 500) }) });
+      if (!r.ok) throw new Error(r.status);
+      f.innerHTML = `<p><b>Recibimos tu pedido.</b> Lo procesamos y te confirmamos por mail en menos de 48 horas. No se te va a volver a cobrar.</p>`;
+    } catch (er) { msg.className = "small b"; msg.textContent = "No se pudo enviar. Escribinos a franco.mica22@gmail.com y lo resolvemos."; go.disabled = false; }
+  });
+})();
+</script>
+</body>
+</html>

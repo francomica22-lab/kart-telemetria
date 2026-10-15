@@ -76,7 +76,7 @@ class Api:
             return {"folder": None, "rows": [], "errors": []}
         files = []
         for dp, _, fs in os.walk(folder):
-            files += [os.path.join(dp, f) for f in fs if f.lower().endswith(".xrk")]
+            files += [os.path.join(dp, f) for f in fs if f.lower().endswith((".xrk", ".xrz"))]
         rows, errors, new = [], [], False
         for p in files:
             key = f"{p}|{os.path.getmtime(p)}"
@@ -117,6 +117,14 @@ class Api:
             return {"path": path}
         except Exception as e:
             return {"error": f"No se pudo exportar: {e}"}
+
+    def open_url(self, url):
+        """Abre un link (pago, terminos) en el navegador del sistema. Solo https."""
+        if not isinstance(url, str) or not url.startswith("https://"):
+            return {"error": "link inválido"}
+        import webbrowser
+        webbrowser.open(url)
+        return {"ok": True}
 
     def save_setup(self, path, values):
         try:

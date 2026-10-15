@@ -11,6 +11,21 @@
     simple: { nombre: "Simple", funciones: ["analizar", "simple", "pdf"] },
     pro: { nombre: "Pro", funciones: ["analizar", "simple", "pdf", "detallado", "link", "setup", "video"] },
   };
+  // precios mostrados (el servidor tiene los suyos y es el que cobra; mantener iguales)
+  const PRECIOS = {
+    ARS: { simple: { mensual: 9900, anual: 99000 }, pro: { mensual: 19900, anual: 199000 } },
+    USD: { simple: { mensual: 9, anual: 90 }, pro: { mensual: 19, anual: 190 } },
+  };
+  const enArgentina = () => { try { return /Argentina|Buenos_Aires|Cordoba|Mendoza|Salta|Jujuy|Tucuman|Catamarca|La_Rioja|San_Juan|San_Luis|Rio_Gallegos|Ushuaia/.test(Intl.DateTimeFormat().resolvedOptions().timeZone); } catch (e) { return true; } };
+  const fmt = (v, m) => m == "ARS" ? "$" + v.toLocaleString("es-AR") : "USD " + v;
+  const abrir = url => { if (window.pywebview && window.pywebview.api && window.pywebview.api.open_url) window.pywebview.api.open_url(url); else window.open(url, "_blank", "noopener"); };
+  async function fn(nombre, body) {
+    const t = await token(); if (!t) throw new Error("Ingresá a tu cuenta.");
+    const r = await fetch(`${URL}/functions/v1/${nombre}`, { method: "POST", headers: { apikey: KEY, Authorization: "Bearer " + t, "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok && !j.msg) throw new Error(j.error || "No se pudo completar (" + r.status + ").");
+    return j;
+  }
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const store = {
     get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
@@ -136,27 +151,84 @@
     setTimeout(() => d.querySelector("#a-em").focus(), 50);
   }
   function panel() {
-    const e = estado();
+    const e = estado(), p = store.get("kt-plan");
     const d = modal(`<h2>Tu cuenta</h2><p>${esc(e.email)}</p>
       <div class="tiles">${!e.vigente ? `<div class="tile bad"><div class="eyebrow">Plan</div><div class="tv">Sin plan</div><div class="ts">${e.sinDatos ? "No pudimos consultar tu plan. Revisá la conexión." : "Tu prueba o tu suscripción terminó."}</div></div>`
         : `<div class="tile"><div class="eyebrow">Plan</div><div class="tv">${esc(e.planNombre)}${e.prueba ? " · prueba" : ""}</div><div class="ts">${e.prueba ? `te quedan ${e.dias} día${e.dias == 1 ? "" : "s"}` : `${e.estado == "cancelada" ? "cancelada, vale hasta" : "se renueva el"} ${new Date(e.vence).toLocaleDateString("es-AR")}`}</div></div>`}</div>
       ${e.revisarOnline ? `<p class="small b">Hace más de ${GRACIA_DIAS} días que el programa no se conecta: conectate a internet para seguir usándolo.</p>` : ""}
-      <div class="mact"><button class="btn" id="p-out">Cerrar sesión</button><button class="btn" id="p-ref">Actualizar</button><button class="btn primary" id="p-planes">Ver planes</button></div>`);
+      ${p && p.portal ? `<p class="small"><a href="${esc(p.portal)}" target="_blank" rel="noopener">Facturas y medio de pago</a></p>` : ""}
+      ${e.vigente && !e.prueba && e.estado == "activa" ? `<p class="small"><button class="link" id="p-baja">Dar de baja la suscripción</button> · <button class="link" id="p-arr">Botón de arrepentimiento</button></p>` : ""}
+      <div class="mact"><button class="btn" id="p-out">Cerrar sesión</button><button class="btn" id="p-ref">Actualizar</button><button class="btn primary" id="p-planes">${e.vigente && !e.prueba ? "Cambiar de plan" : "Ver planes"}</button></div>`);
+    const bb = d.querySelector("#p-baja"); if (bb) bb.addEventListener("click", () => { d.remove(); baja("baja"); });
+    const ba = d.querySelector("#p-arr"); if (ba) ba.addEventListener("click", () => { d.remove(); baja("arrepentimiento"); });
     d.querySelector("#p-out").addEventListener("click", async () => { await salir(); d.remove(); });
     d.querySelector("#p-ref").addEventListener("click", async () => { await refrescar(); d.remove(); panel(); });
     d.querySelector("#p-planes").addEventListener("click", () => { d.remove(); planes(); });
   }
-  // por ahora sin cobro: la parte de pago (Mercado Pago / exterior) se conecta aca
   function planes(motivo) {
     const fl = f => ({ analizar: "Analizar y comparar tandas", simple: "Análisis simple", pdf: "Exportar a PDF", detallado: "Análisis detallado (curvas, sectores, G)", link: "Compartir por link y QR", setup: "Setup y carburación", video: "Video sincronizado" }[f]);
     const all = PLANES.pro.funciones;
+    let periodo = "anual", moneda = enArgentina() ? "ARS" : "USD";
     const d = modal(`<h2>${esc(motivo || "Planes")}</h2>
-      <div class="planes">${Object.entries(PLANES).map(([k, p]) => `<div class="plan${k == "pro" ? " rec" : ""}"><h3>${p.nombre}</h3>
+      <div class="pl-opts"><div class="seg" role="group" aria-label="Período"><button type="button" data-per="mensual">Mensual</button><button type="button" data-per="anual">Anual · 2 meses gratis</button></div>
+        <div class="seg" role="group" aria-label="Moneda"><button type="button" data-mon="ARS">Pesos</button><button type="button" data-mon="USD">Dólares</button></div></div>
+      <div class="planes">${Object.entries(PLANES).map(([k, p]) => `<div class="plan${k == "pro" ? " rec" : ""}"><h3>${p.nombre}</h3><div class="pr" data-pr="${k}"></div>
         <ul>${all.map(f => `<li class="${p.funciones.includes(f) ? "" : "no"}">${p.funciones.includes(f) ? "✓" : "–"} ${fl(f)}</li>`).join("")}</ul>
-        <button class="btn${k == "pro" ? " primary" : ""}" data-plan="${k}" disabled>Suscribirme (pronto)</button></div>`).join("")}</div>
-      <p class="small ink2">Mensual o anual con descuento. El pago se habilita en la próxima versión.</p>
+        <button class="btn${k == "pro" ? " primary" : ""}" data-plan="${k}">Suscribirme</button></div>`).join("")}</div>
+      <p class="small ink2" id="pl-nota"></p><p class="small" id="pl-msg" role="status"></p>
+      <p class="small ink2">Se renueva sola; la cancelás cuando quieras desde tu cuenta (botón de baja). Tenés 10 días para arrepentirte y te devolvemos todo. <a href="https://francomica22-lab.github.io/kart-telemetria/terminos.html" target="_blank" rel="noopener">Términos</a></p>
       <div class="mact"><button class="btn" id="pl-x">Cerrar</button></div>`);
+    const pintar = () => {
+      d.querySelectorAll("[data-per]").forEach(b => b.classList.toggle("on", b.dataset.per == periodo));
+      d.querySelectorAll("[data-mon]").forEach(b => b.classList.toggle("on", b.dataset.mon == moneda));
+      d.querySelectorAll("[data-pr]").forEach(el => { const v = PRECIOS[moneda][el.dataset.pr][periodo]; el.innerHTML = `<b>${fmt(v, moneda)}</b> <span class="muted">/ ${periodo == "anual" ? "año" : "mes"}</span>${periodo == "anual" ? `<div class="small ink2">equivale a ${fmt(Math.round(v / 12), moneda)} por mes</div>` : ""}`; });
+      d.querySelector("#pl-nota").textContent = moneda == "ARS" ? "Pagás con Mercado Pago (tarjeta de crédito o débito, o dinero en cuenta)." : "Pagás con tarjeta internacional (Lemon Squeezy). Los impuestos de tu país se agregan al pagar.";
+    };
+    d.querySelectorAll("[data-per]").forEach(b => b.addEventListener("click", () => { periodo = b.dataset.per; pintar(); }));
+    d.querySelectorAll("[data-mon]").forEach(b => b.addEventListener("click", () => { moneda = b.dataset.mon; pintar(); }));
+    d.querySelectorAll("[data-plan]").forEach(b => b.addEventListener("click", async () => {
+      const m = d.querySelector("#pl-msg");
+      if (!estado().logueado) { d.remove(); login("Ingresá para suscribirte"); return; }
+      b.disabled = true; m.className = "small ink2"; m.textContent = "Abriendo el pago…";
+      try {
+        const r = await fn("suscribir", { plan: b.dataset.plan, periodo, proveedor: moneda == "ARS" ? "mp" : "ls" });
+        if (!r.url) throw new Error(r.error || "No se pudo abrir el pago.");
+        abrir(r.url);
+        m.textContent = "Se abrió el pago en el navegador. Cuando termines, volvé acá: el plan se activa solo en un minuto.";
+        esperarPago();
+      } catch (e) { m.className = "small b"; m.textContent = e.message; }
+      finally { b.disabled = false; }
+    }));
     d.querySelector("#pl-x").addEventListener("click", () => d.remove());
+    pintar();
+  }
+  // despues de pagar: revisar el plan cada 10 s durante 10 minutos (el aviso del cobro tarda unos segundos)
+  let espera = null;
+  function esperarPago() {
+    clearInterval(espera); let n = 0;
+    const antes = JSON.stringify(store.get("kt-plan"));
+    espera = setInterval(async () => {
+      n++; await refrescar();
+      const e = estado();
+      if (JSON.stringify(store.get("kt-plan")) != antes && e.vigente && !e.prueba) { clearInterval(espera); document.querySelectorAll(".modal").forEach(m => m.remove()); aviso(`¡Listo! Tu plan ${e.planNombre} está activo.`); }
+      if (n > 60) clearInterval(espera);
+    }, 10000);
+  }
+  function aviso(t) { const d = modal(`<h2>${esc(t)}</h2><div class="mact"><button class="btn primary" id="av-ok">Seguir</button></div>`); d.querySelector("#av-ok").addEventListener("click", () => d.remove()); }
+  // boton de baja y de arrepentimiento
+  function baja(tipo) {
+    const e = estado(), arr = tipo == "arrepentimiento";
+    const d = modal(`<h2>${arr ? "Botón de arrepentimiento" : "Dar de baja la suscripción"}</h2>
+      <p class="ink2">${arr ? "Si pagaste hace 10 días o menos, cancelamos ya y te devolvemos todo lo cobrado." : `Se cancela la renovación. Seguís usando tu plan hasta el ${new Date(e.vence).toLocaleDateString("es-AR")} y no se te cobra más.`}</p>
+      <label class="acct-f"><span class="small ink2">¿Por qué? (opcional, nos ayuda a mejorar)</span><textarea id="b-mot" rows="2" maxlength="500"></textarea></label>
+      <p class="small" id="b-msg" role="status"></p>
+      <div class="mact"><button class="btn" id="b-x">Volver</button><button class="btn primary" id="b-go">${arr ? "Arrepentirme y pedir la devolución" : "Dar de baja"}</button></div>`);
+    d.querySelector("#b-x").addEventListener("click", () => d.remove());
+    d.querySelector("#b-go").addEventListener("click", async () => {
+      const m = d.querySelector("#b-msg"), go = d.querySelector("#b-go"); go.disabled = true; m.className = "small ink2"; m.textContent = "Procesando…";
+      try { const r = await fn("cancelar", { tipo, motivo: d.querySelector("#b-mot").value }); m.className = "small"; m.textContent = r.msg || "Listo."; await refrescar(); go.hidden = true; }
+      catch (er) { m.className = "small b"; m.textContent = er.message; go.disabled = false; }
+    });
   }
   // devuelve true si puede usar la funcion; si no, muestra lo que corresponda
   function requiere(f) {
@@ -174,5 +246,5 @@
     listeners.push(pintar); pintar();
   }
 
-  window.KTA = { crear, ingresar, recuperar, salir, refrescar, estado, puede, requiere, login, panel, planes, montar, onChange: f => listeners.push(f), PLANES, token };
+  window.KTA = { crear, ingresar, recuperar, salir, refrescar, estado, puede, requiere, login, panel, planes, baja, montar, onChange: f => listeners.push(f), PLANES, PRECIOS, token, fn };
 })();

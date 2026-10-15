@@ -10,8 +10,9 @@ shutil.copytree(os.path.join(ROOT, "web"), OUT, dirs_exist_ok=True)
 os.makedirs(os.path.join(OUT, "app"), exist_ok=True)
 for m in ("kartlib", "motor", "tandas", "sesiones", "setup_kart", "circuito"):
     shutil.copy(os.path.join(ROOT, "app", f"{m}.py"), os.path.join(OUT, "app"))
-idx = os.path.join(OUT, "index.html")
-html = open(idx, encoding="utf8").read().replace("__VERSION__", VERSION)
-open(idx, "w", encoding="utf8").write(html)
+# la portada (landing) va en la raiz y la app web en app.html; el programa de escritorio sigue usando web/index.html
+app_html = open(os.path.join(OUT, "index.html"), encoding="utf8").read().replace("__VERSION__", VERSION)
+open(os.path.join(OUT, "app.html"), "w", encoding="utf8").write(app_html)
+os.replace(os.path.join(OUT, "landing.html"), os.path.join(OUT, "index.html"))
 open(os.path.join(OUT, ".nojekyll"), "w").close()
 print(f"site v{VERSION} -> {OUT}")
