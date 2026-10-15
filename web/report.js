@@ -110,10 +110,29 @@
       const m = pa && pb && pa[1] > 1 && pb[1] > 1 ? 2 * Math.sqrt(pa[0] ** 2 / pa[1] + pb[0] ** 2 / pb[1]) : 0;
       return Math.abs(d) >= Math.max(min, m) ? d : 0;
     };
-    function reasons(a, b, kind) {
+    const pct = x => (x * 100).toFixed(0) + "%";
+    // tramo donde se pierde el tiempo (entrada: frenada hasta el giro; medio: hasta el vertice; salida: hasta la recta)
+    function tramoTxt(g, d) {
+      if (!g || !g.fases) return "";
+      const i = ["entrada", "medio", "salida"].indexOf(g.tramo), x = g.fases[i];
+      return x >= 0.5 * d && x >= 0.02 ? `${x.toFixed(2)} s se pierden ${g.tramo == "medio" ? "en el medio de la curva" : "en la " + g.tramo}` : "";
+    }
+    function reasons(a, b, kind, g) {
       const r = [], A = a.t3, B = b.t3;
-      if (kind == "mixto") r.push(`la G lateral queda cerca pero por debajo de la otra (${b.lat_ses_max.toFixed(2)} g contra ${a.lat_ses_max.toFixed(2)} g)`);
-      if (kind == "agarre") r.push(`en ninguna vuelta llegó a la G lateral de la otra (${b.lat_ses_max.toFixed(2)} g contra ${a.lat_ses_max.toFixed(2)} g)`);
+      g = g || {};
+      const tr = tramoTxt(g, B.tiempo - A.tiempo); if (tr) r.push(tr);
+      if (g.uso) {
+        const [uA, uB] = g.uso, [cA, cB] = g.cap;
+        if (kind == "agarre") r.push(`estuvo al límite de su kart (usó el ${pct(uB)} del agarre que mostró en la tanda) y aun así su kart sostiene ${cB.toFixed(2)} g contra ${cA.toFixed(2)} g`);
+        else if (kind == "mixto") r.push(`su kart mostró algo menos de agarre en la tanda (${cB.toFixed(2)} g contra ${cA.toFixed(2)} g): parte puede ser agarre`);
+        else if (uB < uA - 0.08) r.push(`usó el ${pct(uB)} del agarre que su kart mostró en otras curvas (la otra, el ${pct(uA)}): había agarre de sobra`);
+      } else {
+        if (kind == "mixto") r.push(`la G lateral queda cerca pero por debajo de la otra (${b.lat_ses_max.toFixed(2)} g contra ${a.lat_ses_max.toFixed(2)} g)`);
+        if (kind == "agarre") r.push(`en ninguna vuelta llegó a la G lateral de la otra (${b.lat_ses_max.toFixed(2)} g contra ${a.lat_ses_max.toFixed(2)} g)`);
+      }
+      { const dLv = posDiff(a, b, "s_levanta", 5); if (dLv) r.push(`levanta ${f0(dLv)} m ${dLv < 0 ? "antes" : "más tarde"}`); }
+      if (A.v_giro != null && B.v_giro != null) { const dG = B.v_giro - A.v_giro; if (Math.abs(dG) >= 1) r.push(`empieza a girar ${f1(dG)} km/h más ${dG < 0 ? "lento" : "rápido"}`); }
+      if (A.bajadas != null && B.bajadas != null && B.bajadas - A.bajadas >= 0.5) r.push(`rebaja en la entrada (la otra ${A.bajadas < 0.5 ? "no rebaja" : "rebaja menos"}): puede desacomodar la cola`);
       const dAp = posDiff(a, b, "s_vmin", 4); if (dAp) r.push(`hace el vértice ${f0(dAp)} m ${dAp < 0 ? "antes" : "más tarde"}`);
       const dV = B.v_min - A.v_min; if (Math.abs(dV) >= 0.7) r.push(`pasa ${f1(dV)} km/h más ${dV < 0 ? "lento" : "rápido"} por el vértice`);
       const dO = B.v_salida - A.v_salida; if (Math.abs(dO) >= 0.8) r.push(`sale ${f1(dO)} km/h más ${dO < 0 ? "lento" : "rápido"}`);
@@ -125,6 +144,8 @@
     }
     function advice(a, b) {
       const A = a.t3, B = b.t3, t = [];
+      if (posDiff(a, b, "s_levanta", 5) < 0) t.push(`levantar más tarde, cerca del metro ${f0(A.s_levanta)}`);
+      if (A.v_giro != null && B.v_giro != null && B.v_giro - A.v_giro <= -1.5) t.push(`llegar al giro con más velocidad (la otra gira a ${f1(A.v_giro)} km/h)`);
       if (posDiff(a, b, "s_vmin", 4) < 0) t.push(`esperar el vértice hasta cerca del metro ${f0(A.s_vmin)}`);
       if (B.freno_max - A.freno_max <= -0.12) t.push(`frenar más fuerte y más corto (la otra llega a ${A.freno_max.toFixed(2)} g)`);
       if (posDiff(a, b, "s_acel", 4) > 0) t.push(`acelerar antes, cerca del metro ${f0(A.s_acel)}`);
@@ -134,7 +155,7 @@
     }
     function driveConclusion(id) {
       const gap = avg(S[id].top) - avg(S[REF].top);
-      const parts = C.map(c => ({ n: c.n, k: c.diag[id][0], d: c.diag[id][1], a: c.by[REF], b: c.by[id] }));
+      const parts = C.map(c => ({ n: c.n, k: c.diag[id][0], d: c.diag[id][1], g: c.diag[id][2], a: c.by[REF], b: c.by[id] }));
       const lost = parts.filter(p => ["manejo", "agarre", "mixto"].includes(p.k)).sort((x, y) => y.d - x.d), won = parts.filter(p => p.k == "gana");
       const sum = k => lost.filter(p => p.k == k).reduce((a, p) => a + p.d, 0);
       const man = sum("manejo"), agr = sum("agarre"), mix = sum("mixto");
@@ -146,7 +167,7 @@
       const split = lost.length ? `<span class="chip manejo">manejo ${man.toFixed(2)} s</span> <span class="chip agarre">agarre ${agr.toFixed(2)} s</span>${mix >= 0.02 ? ` <span class="chip mixto">zona gris ${mix.toFixed(2)} s</span>` : ""}` : "";
       const g = Math.abs(gap) < 0.01 ? "<b>igual</b>" : `<b>${gap > 0 ? "+" : "−"}${Math.abs(gap).toFixed(3)} s</b> por vuelta`;
       const items = lost.slice(0, 3).map(p => {
-        const r = reasons(p.a, p.b, p.k);
+        const r = reasons(p.a, p.b, p.k, p.g);
         if (!r.length) {
           const prev = C.find(c => c.n == p.n - 1);
           const dPrev = prev ? prev.by[id].t3.v_salida - prev.by[REF].t3.v_salida : 0;
@@ -291,6 +312,8 @@
       const tipFor = (p) => {
         if (p.k == "agarre") return "El kart agarró menos: revisá gomas o setup (no es manejo).";
         const A = p.a.t3, B = p.b.t3, t = [];
+        if (posDiff(p.a, p.b, "s_levanta", 5) < 0) t.push("levantá más tarde");
+        if (A.v_giro != null && B.v_giro != null && B.v_giro - A.v_giro <= -1.5) t.push("llegá al giro con más velocidad");
         if (posDiff(p.a, p.b, "s_vmin", 4) < 0) t.push("girá más tarde: esperá el vértice");
         if (B.freno_max - A.freno_max <= -0.12) t.push("frená más fuerte y más corto");
         if (posDiff(p.a, p.b, "s_acel", 4) > 0) t.push("volvé a acelerar antes");
@@ -300,7 +323,7 @@
           const prev = C.find(c => c.n == p.n - 1);
           if (prev && prev.by[p.id].t3.v_salida - prev.by[REF].t3.v_salida <= -0.8) t.push(`llegás lento porque salís lento de la curva ${p.n - 1}: mejorá esa salida`);
         }
-        if (!t.length) return p.k == "mixto" ? "Manejo y agarre mezclados: repetí la línea de tu mejor tanda." : "Pequeña diferencia repartida en toda la curva.";
+        if (!t.length) return p.k == "mixto" ? "Manejo y agarre mezclados: repetí la línea de tu mejor tanda." : p.g && p.g.tramo ? `La diferencia está sobre todo en ${p.g.tramo == "medio" ? "el medio de la curva" : "la " + p.g.tramo}: miralo en el video.` : "Pequeña diferencia repartida en toda la curva.";
         const txt = t.join(" y ");
         return txt.charAt(0).toUpperCase() + txt.slice(1) + ".";
       };
@@ -341,13 +364,16 @@
       const shortTip = p => {
         if (p.k == "agarre") return "Le faltó agarre: gomas o setup";
         const A = p.a.t3, B = p.b.t3, t = [];
+        if (posDiff(p.a, p.b, "s_levanta", 5) < 0) t.push("Levantá más tarde");
+        if (A.v_giro != null && B.v_giro != null && B.v_giro - A.v_giro <= -1.5) t.push("Entrá más rápido al giro");
         if (posDiff(p.a, p.b, "s_vmin", 4) < 0) t.push("Girá más tarde");
         if (B.freno_max - A.freno_max <= -0.12) t.push("Frená más fuerte y corto");
         if (posDiff(p.a, p.b, "s_acel", 4) > 0) t.push("Acelerá antes");
         if (posDiff(p.a, p.b, "off_apex", 0.6)) t.push(`Repetí la línea de la ${BT(REF)}`);
         if (!t.length && B.v_salida - A.v_salida <= -0.8) t.push("Priorizá la salida");
         if (!t.length) { const prev = C.find(c => c.n == p.n - 1); if (prev && prev.by[p.id].t3.v_salida - prev.by[REF].t3.v_salida <= -0.8) t.push(`Salí mejor de la curva ${p.n - 1}`); }
-        if (!t.length) return p.k == "mixto" ? "Repetí la línea de tu mejor tanda" : "Sin un error claro: miralo en el video";
+        const tz = p.g && p.g.tramo ? (p.g.tramo == "medio" ? "el medio de la curva" : "la " + p.g.tramo) : "";
+        if (!t.length) return p.k == "mixto" ? "Repetí la línea de tu mejor tanda" : tz ? `Perdés en ${tz}: miralo en el video` : "Sin un error claro: miralo en el video";
         return t.slice(0, 2).join(" y ");
       };
       // las vueltas como una linea chica por tanda (abajo = mas rapido)
@@ -383,7 +409,7 @@
       }
       for (const id of others) {
         const gap = avg(S[id].top) - avg(S[REF].top);
-        const parts = C.map(c => ({ id, n: c.n, k: c.diag[id][0], d: c.diag[id][1], a: c.by[REF], b: c.by[id] }));
+        const parts = C.map(c => ({ id, n: c.n, k: c.diag[id][0], d: c.diag[id][1], g: c.diag[id][2], a: c.by[REF], b: c.by[id] }));
         const lost = parts.filter(p => ["manejo", "agarre", "mixto"].includes(p.k)).sort((x, y) => y.d - x.d), won = parts.filter(p => p.k == "gana");
         const sum = k => lost.filter(p => p.k == k).reduce((a, p) => a + p.d, 0), man = sum("manejo"), agr = sum("agarre"), mix = sum("mixto");
         const porque = !lost.length ? "sin una curva clara" : man >= 2 * agr && man >= mix ? "manejo" : agr >= 2 * man && agr >= mix ? "agarre" : mix > man && mix > agr ? "manejo y agarre, difícil de separar" : "manejo y agarre";
@@ -468,7 +494,7 @@
             }).join("") + `</div>`;
         }).join("")}</div></div>
       <div class="panel"><h2>Tabla completa</h2><p class="ink2">Tiempos y velocidades: promedio de las mejores vueltas. Vértice, frenada, aceleración y línea: mediana de todas las vueltas rápidas, sin valores raros (varían vuelta a vuelta). Línea: desvío de la trayectoria en el vértice respecto de la referencia (m).</p><div class="tw"><table class="tbl"></table></div></div>
-      <p class="note">Criterio automático: si la tanda más lenta nunca llegó al 94% de la G máxima de la referencia en esa curva, la pérdida se marca como agarre; entre 94% y 98%, zona gris (mixto); por encima, manejo. Es una primera lectura: no sabe de cambios de setup, gomas ni hora del día.</p>`;
+      <p class="note">Criterio automático: la G lateral baja también cuando se entra lento, así que no alcanza con comparar la G de las dos tandas. Para cada kart se toma el agarre que mostró en la tanda (la curva donde más G sostuvo) y se mira qué parte usó en cada curva. Si dejó agarre sin usar, o si perdió el tiempo en la entrada frenando o levantando antes, es manejo. Es agarre solo si estuvo al límite de su kart y su kart sostiene menos de 94% de la G del otro; entre 94% y 98%, zona gris. Es una primera lectura: no sabe de cambios de setup, gomas ni hora del día.</p>`;
     (() => {
       const svg = P(1).querySelector(".gmax"), PL = 50, PB = 30, PT = 12, H = 300, W = 800;
       const vals = C.flatMap(c => IDS.flatMap(id => [c.by[id].t3.lat_max, c.by[id].lat_ses_max]));
