@@ -45,7 +45,8 @@ def lateral_offset_fn(ref):
     return f
 
 
-POS_KEYS = ["s_vmin", "off_apex", "s_freno", "s_acel"]
+POS_KEYS = ["s_vmin", "off_apex", "s_freno", "s_acel", "s_levanta"]
+FASES = ["t_ent", "t_med", "t_sal"]
 
 
 def robust_pos(x):
@@ -62,16 +63,46 @@ def robust_pos(x):
     return float(np.median(v)), float(v.std(ddof=1)) if len(v) > 1 else 0.0, int(len(v))
 
 
-def diagnose(A, B):
-    """Clasifica la perdida de B contra A en una curva: agarre si B nunca llego a la G de A."""
-    d = B["t3"]["tiempo"] - A["t3"]["tiempo"]
+def turn_in(rdf, c):
+    """Punto de giro de la curva en la vuelta de referencia: la G lateral pasa la mitad de su pico antes del vertice."""
+    seg = rdf[(rdf.s >= c["s_start"]) & (rdf.s <= c["s_apex"])]
+    g = seg.latg.abs().rolling(7, center=True, min_periods=1).median()
+    if len(seg) < 5 or not np.isfinite(g).any():
+        return (c["s_start"] + c["s_apex"]) / 2
+    pico = rdf[(rdf.s >= c["s_start"]) & (rdf.s <= c["s_end"])].latg.abs().rolling(7, center=True, min_periods=1).median().max()
+    hit = seg.s[g >= 0.5 * pico]
+    return float(hit.iloc[0]) if len(hit) else (c["s_start"] + c["s_apex"]) / 2
+
+
+def diagnose(A, B, capA, capB):
+    """Clasifica la perdida de B contra A en una curva.
+
+    La G lateral baja tambien cuando el piloto entra lento (G = v^2/R), asi que no alcanza con comparar la G
+    de las dos tandas. Agarre es cuando B estaba al limite de SU kart (la G que mostro en las otras curvas) y
+    aun asi ese limite es mas bajo que el de A. Si B dejo agarre sin usar, la perdida es de manejo, y se dice
+    en que tramo (entrada, medio o salida) se fue el tiempo."""
+    a, b = A["t3"], B["t3"]
+    d = b["tiempo"] - a["tiempo"]
+    fases = [round(b[k] - a[k], 3) if a.get(k) is not None and b.get(k) is not None else 0.0 for k in FASES]
+    uA, uB = a["lat_max"] / max(capA, 1e-6), b["lat_max"] / max(capB, 1e-6)
+    det = dict(fases=fases, tramo=["entrada", "medio", "salida"][int(np.argmax(fases))],
+               uso=[round(uA, 2), round(uB, 2)], cap=[round(capA, 2), round(capB, 2)])
     if abs(d) < 0.02:
-        return "neutro", d
+        return "neutro", d, det
     if d < 0:
-        return "gana", d
-    ratio = B["lat_ses_max"] / max(A["lat_ses_max"], 1e-6)
-    # zona gris: con unos metros de diferencia en la referencia puede cambiar de lado
-    return ("agarre" if ratio < 0.94 else "mixto" if ratio < 0.98 else "manejo"), d
+        return "gana", d, det
+    kart_menos = capB < 0.94 * capA          # el kart de B mostro menos agarre en toda la tanda
+    if uB < uA - 0.08:                       # B dejo agarre sin usar en esta curva
+        return "manejo", d, det
+    # la perdida esta en la entrada y B freno o levanto antes, o freno mas suave: el error empieza antes de girar
+    dif = lambda k: b[k] - a[k] if a.get(k) is not None and b.get(k) is not None else 0.0
+    if fases[0] >= 0.5 * d and (dif("s_levanta") <= -5 or dif("s_freno") <= -5 or dif("freno_max") <= -0.12):
+        return "manejo", d, det
+    if kart_menos and uB >= uA - 0.04:       # B estuvo al limite de su kart y el kart da menos
+        return "agarre", d, det
+    if kart_menos or capB < 0.98 * capA:     # zona gris
+        return "mixto", d, det
+    return "manejo", d, det
 
 
 def sectors(rdf, sec_traces, L, options=(3, 4)):
@@ -203,6 +234,8 @@ def build_data(paths, top=3, bands=None, log=print):
     rdf = lap_on_distance(S[ref_id], ref_lap, ref)
     corners = detect_corners(rdf, prom=1.5)
     corners[0]["s_start"] = 0.0; corners[-1]["s_end"] = rdf.s.iloc[-1]
+    for c in corners:
+        c["s_giro"] = turn_in(rdf, c)
     offset = lateral_offset_fn(ref)
 
     out = {"ref": ref_id, "ref_lap": int(ref_lap.num), "ref_time": float(ref_lap.time), "sessions": [], "corners": []}
@@ -231,13 +264,22 @@ def build_data(paths, top=3, bands=None, log=print):
                 lg = seg.long.rolling(5, center=True, min_periods=1).median()
                 brk = seg[(lg < -0.3) & (seg.s < d.s[ia])]
                 gas = seg[(lg > 0.15) & (seg.s > d.s[ia])]
+                lev = seg[(lg < -0.1) & (seg.s < d.s[ia])]
+                # tramos fijos (los de la referencia) para que los tiempos sean comparables entre tandas
+                tb = np.interp([c["s_start"], c["s_giro"], c["s_apex"], c["s_end"]], d.s, d.t)
+                ent = seg[seg.s <= c["s_apex"]]
+                gr = ent.gear.round() if "gear" in ent else pd.Series(dtype=float)
+                bajadas = int((gr.diff() < 0).sum()) if gr.notna().sum() > 5 else np.nan
                 rows.append(dict(ses=sid, lap=int(lap.num), top=lap.num in best_laps.num.values, curva=c["n"],
                                  tiempo=seg.t.iloc[-1] - seg.t.iloc[0], v_min=vm, s_vmin=s_ap,
                                  v_salida=seg.speed.iloc[-1], lat_max=seg.latg_s.max(),
                                  freno_max=-seg.long.rolling(5, center=True, min_periods=1).median().min(),
                                  off_apex=d.off[ia],
                                  s_freno=float(brk.s.iloc[0]) if len(brk) else np.nan,
-                                 s_acel=float(gas.s.iloc[0]) if len(gas) else np.nan))
+                                 s_acel=float(gas.s.iloc[0]) if len(gas) else np.nan,
+                                 s_levanta=float(lev.s.iloc[0]) if len(lev) else np.nan,
+                                 t_ent=tb[1] - tb[0], t_med=tb[2] - tb[1], t_sal=tb[3] - tb[2],
+                                 v_giro=float(np.interp(c["s_giro"], d.s, d.speed)), bajadas=bajadas))
         allg = pd.concat(traces.values())
         ang = np.degrees(np.arctan2(allg.long, allg.latg))
         mag = np.hypot(allg.latg, allg.long).rolling(5, center=True, min_periods=1).median()
@@ -257,21 +299,28 @@ def build_data(paths, top=3, bands=None, log=print):
             laps=laps, env=env, env_bins=bins.tolist(), s=bd.s[::2].tolist(), v=bd.speed[::2].round(1).tolist(),
             dt=(bd.t - rdf.t)[::2].round(3).tolist(), vmax=round(float(bd.speed.max()), 1)))
     R = pd.DataFrame(rows)
+    bys = []
     for c in corners:
         by = {}
         for sid in S:
             q = R[(R.ses == sid) & (R.curva == c["n"])]
             t = q[q.top]
-            t3 = {k: round(float(t[k].mean()), 3) for k in ["tiempo", "v_min", "v_salida", "lat_max", "freno_max"]}
+            t3 = {k: round(float(t[k].mean()), 3) for k in ["tiempo", "v_min", "v_salida", "lat_max", "freno_max", "v_giro"] + FASES}
+            t3["bajadas"] = round(float(t.bajadas.mean()), 1) if t.bajadas.notna().any() else None
             pos = {}
             for k in POS_KEYS:          # posiciones: mediana de todas las vueltas rapidas, sin valores raros
                 m, sd, n = robust_pos(q[k])
                 t3[k] = round(m, 2) if m is not None else None
                 pos[k] = [round(sd, 2), n] if m is not None else None
             by[sid] = dict(t3=t3, pos=pos, lat_ses_max=round(float(q.lat_max.max()), 2), best_sector=round(float(q.tiempo.min()), 3))
-        diag = {sid: diagnose(by[ref_id], by[sid]) for sid in S if sid != ref_id}
-        out["corners"].append(dict(n=c["n"], s0=c["s_start"], sa=c["s_apex"], s1=c["s_end"], by=by,
-                                   diag={k: [v[0], round(v[1], 3)] for k, v in diag.items()}))
+        bys.append(by)
+    # agarre que mostro cada kart: la curva donde mas G lateral sostuvo (promedio de sus mejores vueltas)
+    cap = {sid: max(by[sid]["t3"]["lat_max"] for by in bys) for sid in S}
+    for c, by in zip(corners, bys):
+        diag = {sid: diagnose(by[ref_id], by[sid], cap[ref_id], cap[sid]) for sid in S if sid != ref_id}
+        out["corners"].append(dict(n=c["n"], s0=c["s_start"], sa=c["s_apex"], s1=c["s_end"], sg=round(c["s_giro"], 1), by=by,
+                                   diag={k: [v[0], round(v[1], 3), v[2]] for k, v in diag.items()}))
+    out["agarre_kart"] = {sid: round(v, 2) for sid, v in cap.items()}
     for s in out["sessions"]:
         s["ideal"] = round(sum(c["by"][s["id"]]["best_sector"] for c in out["corners"]), 3)
     out["sectors"] = sectors(rdf, sec_traces, ref.length)

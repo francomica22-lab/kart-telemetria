@@ -12,13 +12,14 @@ CH = {  # canal -> nombre corto
     "GPS_InlineAcc": "long",
     "GPS_Yaw_Rate": "yaw",
     "Water Temp": "water",
+    "Calculated_Gear": "gear",
     "GPS Latitude": "lat",
     "GPS Longitude": "lon",
 }
 DS = 1.0  # resolucion en metros
 # canales internos del logger que no son sensores utiles para el piloto
 SKIP_CH = {"Best Run Diff", "Best Today Diff", "Prev Lap Diff", "Ref Lap Diff", "Predictive Time", "TimTpItow",
-           "TimePulseTick", "ZeroX5", "ZeroX50", "Calculated_Gear", "Distance Lap", "MagnetomX", "MagnetomY", "MagnetomZ"}
+           "TimePulseTick", "ZeroX5", "ZeroX50", "Distance Lap", "MagnetomX", "MagnetomY", "MagnetomZ"}
 
 
 def load_session(path):
@@ -153,7 +154,7 @@ def lap_on_distance(ses, lap, ref):
     u = np.r_[True, np.diff(sm) > 0]
     t_of_s = np.interp(grid + s0, sm[u], t[m][u])
     df = pd.DataFrame({"s": grid, "t": (t_of_s - t0) / 1000.0})
-    for k in ("speed", "rpm", "latg", "long", "yaw", "water"):
+    for k in ("speed", "rpm", "latg", "long", "yaw", "water", "gear"):
         tc, v = ses["chans"][k]
         good = np.isfinite(v)
         df[k] = np.interp(t_of_s, tc[good], v[good]) if good.any() else np.nan  # canal ausente (p. ej. sin sensor de agua)
