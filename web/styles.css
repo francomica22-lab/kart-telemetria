@@ -508,3 +508,5 @@ p.foot{background:none;border:0;padding:0;max-width:none}
 .gbtn:hover{background:#f2f2f2}
 .or{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}
 .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.gbtn svg{width:18px!important;height:18px!important;flex:none;max-width:18px}
+.gbtn{padding:10px 14px;min-height:0}
