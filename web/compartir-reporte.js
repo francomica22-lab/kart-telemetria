@@ -42,7 +42,7 @@
     d.innerHTML = `<div class="mbox share" role="dialog" aria-modal="true" aria-labelledby="cs-t"><h2 id="cs-t">Compartir reporte</h2>
       <div class="cs-step1"><p class="ink2 small">Crea un link para abrir este reporte en cualquier celular o computadora. Cualquiera que tenga el link lo puede ver; vence a los 30 días. No se suben tus archivos.</p>
         <label class="toggle small"><input type="checkbox" id="cs-pil"><span>Incluir el nombre del piloto</span></label>
-        <div class="mact"><button class="btn" id="cs-pdf">PDF</button><button class="btn" id="cs-x">Cerrar</button><button class="btn primary" id="cs-go">Crear link y QR</button></div>
+        <div class="mact"><button class="btn" id="cs-pdf">PDF</button><button class="btn" id="cs-x">Cerrar</button>${opts.linkOk === false ? `<button class="btn primary" id="cs-pro">Link y QR · plan Pro</button>` : `<button class="btn primary" id="cs-go">Crear link y QR</button>`}</div>
         <p class="small" id="cs-st"></p></div>
       <div class="cs-step2" hidden>
         <div class="cs-qr"></div>
@@ -54,7 +54,8 @@
     d.querySelector("#cs-x").addEventListener("click", close); d.querySelector("#cs-x2").addEventListener("click", close);
     const pdf = () => { close(); opts.onPdf && opts.onPdf(); };
     d.querySelector("#cs-pdf").addEventListener("click", pdf); d.querySelector("#cs-pdf2").addEventListener("click", pdf);
-    d.querySelector("#cs-go").addEventListener("click", async () => {
+    const pro = d.querySelector("#cs-pro"); if (pro) pro.addEventListener("click", () => { close(); opts.onPro && opts.onPro(); });
+    if (d.querySelector("#cs-go")) d.querySelector("#cs-go").addEventListener("click", async () => {
       const st = d.querySelector("#cs-st"), btn = d.querySelector("#cs-go");
       btn.disabled = true; st.className = "small ink2"; st.textContent = "Subiendo…";
       try {

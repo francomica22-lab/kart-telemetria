@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tu cuenta · Análisis Karting</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  html,body{height:auto}
+  body{overflow:auto}
+  .cbox{max-width:440px;margin:80px auto;padding:0 20px;display:grid;gap:14px}
+  .cbox label{display:grid;gap:6px}
+  .cbox input{width:100%}
+</style>
+</head>
+<body>
+<main class="cbox" id="box"><p class="ink2">Un momento…</p></main>
+<script>
+(() => {
+  const URL = "https://zbesblxiezcfurswanev.supabase.co", KEY = "sb_publishable_HRIpZ4BfWemVZ8TNA37-EQ_tKN1joRG";
+  const box = document.getElementById("box");
+  const q = new URLSearchParams(location.hash.slice(1) || location.search.slice(1));
+  const done = (t, p) => box.innerHTML = `<div class="eyebrow">Análisis Karting</div><h1>${t}</h1><p class="ink2">${p}</p>`;
+  if (q.get("error")) return done("El link no funcionó", (q.get("error_description") || "El link venció o ya se usó.").replace(/\+/g, " ") + " Pedí uno nuevo desde el programa.");
+  const at = q.get("access_token"), type = q.get("type");
+  if (!at) return done("Tu cuenta", "Abrí este link desde el mail que te mandamos.");
+  history.replaceState(null, "", location.pathname);   // que el token no quede en la barra
+  if (type == "recovery") {
+    box.innerHTML = `<div class="eyebrow">Análisis Karting</div><h1>Elegí una contraseña nueva</h1>
+      <form id="f" style="display:grid;gap:12px"><label><span>Contraseña nueva</span><input type="password" id="pw" minlength="6" autocomplete="new-password" required></label>
+      <p class="small" id="m" role="status"></p><button class="btn primary">Guardar</button></form>`;
+    document.getElementById("f").addEventListener("submit", async e => {
+      e.preventDefault();
+      const m = document.getElementById("m");
+      const r = await fetch(URL + "/auth/v1/user", { method: "PUT", headers: { apikey: KEY, Authorization: "Bearer " + at, "Content-Type": "application/json" }, body: JSON.stringify({ password: document.getElementById("pw").value }) });
+      if (r.ok) done("Listo", "Tu contraseña cambió. Volvé al programa e ingresá con la nueva.");
+      else { const j = await r.json().catch(() => ({})); m.className = "small b"; m.textContent = j.msg || "No se pudo guardar. Probá con otra contraseña (al menos 6 caracteres)."; }
+    });
+    return;
+  }
+  done("Cuenta confirmada", "Ya podés volver al programa (o a la versión web) e ingresar con tu mail y contraseña. Tenés 7 días de todo gratis.");
+})();
+</script>
+</body>
+</html>

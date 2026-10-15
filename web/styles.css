@@ -474,3 +474,27 @@ p.foot{background:none;border:0;padding:0;max-width:none}
 .stbl td.c-com{white-space:nowrap;max-width:260px}
 .stbl .hide{display:none}
 #home .tw{overflow-x:auto}
+
+/* ===== cuenta y planes ===== */
+#acctbox{margin:8px 0 0}
+.acct{display:flex;gap:8px;align-items:center;justify-content:space-between;width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink);font:inherit;font-size:13px;cursor:pointer;text-align:left}
+.acct:hover{border-color:var(--ink2)}
+.acct .em{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acct .pl{flex:none;font:600 11px var(--display);letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:10px;background:var(--panel2);color:var(--good)}
+.acct .pl.off{color:var(--bad)}
+.acctbox{width:min(460px,100%);display:grid;gap:12px}
+.acct-f{display:grid;gap:12px}
+.acct-f label{display:grid;gap:6px}
+.acct-f input{width:100%}
+.acct-tabs{display:flex;gap:6px}
+.acct-tabs button{flex:1;padding:8px;border:1px solid var(--line);border-radius:4px;background:none;color:var(--ink2);cursor:pointer;font:inherit}
+.acct-tabs button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.planes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.plan{border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;gap:10px;align-content:start}
+.plan.rec{border-color:var(--ink2)}
+.plan h3{margin:0;font:700 20px var(--display)}
+.plan ul{list-style:none;margin:0;padding:0;display:grid;gap:4px;font-size:13px}
+.plan li.no{color:var(--muted)}
+.plan .btn{width:100%}
+.modesw button.lock::after{content:" · Pro";font-size:10px;opacity:.7}
+@media (max-width:640px){.planes{grid-template-columns:1fr}}

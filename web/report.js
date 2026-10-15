@@ -73,7 +73,11 @@
       try { localStorage.setItem("kt-mode", m); } catch (e) { }
     };
     let mode0 = "simple"; try { mode0 = localStorage.getItem("kt-mode") || "simple"; } catch (e) { }
-    modeBtns.forEach(b => b.addEventListener("click", () => setMode(b.dataset.m)));
+    const puede = f => !opts.puede || opts.puede(f);
+    modeBtns.forEach(b => {
+      if (b.dataset.m == "detalle" && !puede("detallado")) b.classList.add("lock");
+      b.addEventListener("click", () => { if (b.dataset.m == "detalle" && !puede("detallado")) { opts.pedir && opts.pedir("detallado"); return; } setMode(b.dataset.m); });
+    });
     const tabs = root.querySelectorAll(".tab"), panes = root.querySelectorAll(".pane");
     tabs.forEach(b => b.addEventListener("click", () => {
       tabs.forEach(x => x.classList.toggle("on", x == b));
@@ -85,6 +89,7 @@
     const ctx = { D, IDS, S, COL, NAME, M, REF, BT, saveSetup: opts.saveSetup };
     root.querySelectorAll(".kartbtn").forEach(b => b.addEventListener("click", () => KTK.modal(b.dataset.k, () => { window.renderReport(D, root, opts); opts.onKartChange && opts.onKartChange(); })));
     root.querySelectorAll(".setbtn").forEach(b => b.addEventListener("click", () => {
+      if (opts.puede && !opts.puede("setup")) { opts.pedir && opts.pedir("setup"); return; }
       const s = S[b.dataset.id];
       KTX.setupModal(D, s, async vals => {
         const r = await opts.saveSetup(s, vals);
@@ -434,7 +439,7 @@
         }
         txt(svg, MX(tx[0]) - 14, MY(ty[0]) + 5, "★", { "text-anchor": "middle", style: "fill:var(--ink);font-size:15px" });
       });
-      setMode(mode0);
+      setMode(mode0 == "detalle" && !puede("detallado") ? "simple" : mode0);
     })();
 
     /* ================= CURVAS ================= */

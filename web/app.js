@@ -242,6 +242,7 @@
   }
 
   $("go").addEventListener("click", async () => {
+    if (window.KTA && !KTA.requiere("analizar")) return;
     const bands = [[+$("b1a").value, +$("b1b").value], [+$("b2a").value, +$("b2b").value]].filter(b => b[0] > 0 && b[1] > b[0]);
     const opts = { top: Math.max(1, Math.min(5, +$("top").value || 3)), bands };
     busy(true, IS_WEB ? `Analizando ${sel.length} tandas en el navegador…` : `Analizando ${sel.length} tandas…`);
@@ -254,7 +255,8 @@
       await addWeather(last);
       const colors = {}; sel.forEach((p, i) => { const r = rowOf(p); if (r) colors[r.id] = PAL[i % PAL.length]; });
       show("report");
-      renderReport(last, $("report"), { colors, saveSetup, onExport: exportReport, onShare: () => KTR.dialog(last, { onPdf: exportPdf }), onKartChange: () => window.KTS && KTS.share(last, { version: VERSION, web: IS_WEB }) });
+      const puede = f => !window.KTA || KTA.puede(f), pedir = f => !window.KTA || KTA.requiere(f);
+      renderReport(last, $("report"), { colors, saveSetup, puede, pedir, onExport: exportReport, onShare: () => KTR.dialog(last, { onPdf: exportPdf, linkOk: puede("link"), onPro: () => pedir("link") }), onKartChange: () => window.KTS && KTS.share(last, { version: VERSION, web: IS_WEB }) });
       if (window.KTS) KTS.share(last, { version: VERSION, web: IS_WEB });   // resumen anonimo (si esta activado)
       $("main").scrollTop = 0;
     } catch (e) { toast("Error: " + (e.message || e), true); }
@@ -340,6 +342,7 @@
       if (st.bands && st.bands.length) [[$("b1a"), $("b1b")], [$("b2a"), $("b2b")]].forEach((p, i) => { if (st.bands[i]) { p[0].value = st.bands[i][0]; p[1].value = st.bands[i][1]; } });
     } catch (e) { }
     topbar();
+    if (window.KTA) { KTA.montar($("acctbox")); KTA.refrescar(); }
     if (window.KTS) {
       const sh = $("share-on"); sh.checked = KTS.enabled();
       sh.addEventListener("change", () => { KTS.setEnabled(sh.checked); toast(sh.checked ? "Compartir datos anónimos: activado." : "Compartir datos anónimos: desactivado."); });
