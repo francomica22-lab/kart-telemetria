@@ -398,11 +398,17 @@
 
       let h = "";
       if (!others.length) {
-        const op = D.optimo[REF], co = constancia(REF), tips = op ? KTX.optimoTips(op).slice(0, 3) : [];
+        const op = D.optimo[REF], co = constancia(REF);
+        // donde ganar tiempo: primero las curvas con una receta concreta, despues las que solo piden constancia
+        const recs = op ? op.curvas.map(cv => ({ n: cv.n, a: KTX.cornerTip(D, REF, cv.n) })).filter(r => r.a && r.a.pot >= 0.02) : [];
+        const tips = recs.filter(r => r.a.kind && r.a.kind != "parejo").sort((x, y) => y.a.pot - x.a.pot)
+          .concat(recs.filter(r => !r.a.kind || r.a.kind == "parejo").sort((x, y) => y.a.pot - x.a.pot)).slice(0, 3);
+        // reportes guardados con una version anterior (sin datos por vuelta): la lista de antes
+        if (!recs.length && op) for (const t of KTX.optimoTips(op).slice(0, 3)) tips.push({ n: t.n, a: { title: t.why.length ? corto(t.why[0]).replace(/^./, c => c.toUpperCase()) : "Repetí esa curva", pot: t.gain } });
         h += `<section class="sp2">
           <div class="hero" style="--c:${COL[REF]}"><div class="hero-n"><span class="big">${BT(REF)}</span><span class="small ink2">tu mejor vuelta</span></div>
             <div class="hero-t">${op ? `<p class="lead2">Podés hacer <b>${op.optima.toFixed(3)}</b> juntando tus mejores curvas.</p><p class="ink2">Son <b>${(op.mejor - op.optima).toFixed(2)} s</b> que ya hiciste, pero en vueltas distintas.</p>` : ""}</div></div>
-          ${tips.length ? `<div class="panel"><div class="eyebrow">Repetí lo que ya hiciste bien</div><ol class="todo">${tips.map(t => `<li><span class="nb">${t.n}</span><div><b>${t.why.length ? corto(t.why[0]).replace(/^./, c => c.toUpperCase()) : "Repetí esa curva"}</b><small>vuelta ${t.lap} · ${t.gain.toFixed(2)} s mejor que tu promedio</small></div></li>`).join("")}</ol></div>` : ""}
+          ${tips.length ? `<div class="panel"><div class="eyebrow">Dónde ganar tiempo</div><ol class="todo">${tips.map(t => `<li class="go" data-cvgo="${t.n}"><span class="nb">${t.n}</span><div><b>${t.a.title}</b><small>curva ${t.n} · podés ganar ${t.a.pot.toFixed(2)} s · ver la curva ›</small></div></li>`).join("")}</ol></div>` : ""}
           <div class="tiles">${co ? tile("Constancia", co.txt, `±${co.sd.toFixed(2)} s entre vueltas`, co.ok ? "" : "warn") : ""}
             ${(() => { const m = motorTile(REF); return tile("Motor", m.ok ? (m.t == "Sin comparar" ? "OK" : m.t) : m.t, [m.d, carbTxt(REF)].filter(Boolean).join(" · "), m.ok ? "" : "bad"); })()}</div>
         </section>`;
@@ -437,9 +443,12 @@
           </div>
         </section>`;
       }
+      h += KTX.curvaTool(ctx);
       h += `<div class="panel"><div class="eyebrow" style="margin-bottom:6px">Tus vueltas</div>${lapsSpark()}<div class="legend">${legend(IDS)}</div></div>
       <p class="ink2 small foot">${D.circuito ? `${esc(D.circuito.nombre || "")} · ${D.circuito.largo} m · ${D.circuito.curvas.length} curvas · <button class="link" data-go2="8">ficha del circuito</button> · ` : ""}<button class="link" data-go="detalle">ver el porqué de cada número</button></p>`;
       box.innerHTML = alertC + h;
+      const cvt = KTX.wireCurva(ctx, box);
+      if (cvt) box.querySelectorAll("[data-cvgo]").forEach(li => li.addEventListener("click", () => cvt.go(+li.dataset.cvgo, li.dataset.cvid)));
       const gm = box.querySelector("[data-gom]"); if (gm) gm.addEventListener("click", () => { setMode("detalle"); root.querySelector('.tab[data-t="2"]').click(); });
       const g2 = box.querySelector("[data-go2]"); if (g2) g2.addEventListener("click", () => { setMode("detalle"); root.querySelector('.tab[data-t="8"]').click(); });
       box.querySelector("[data-go]").addEventListener("click", () => { setMode("detalle"); root.scrollIntoView(); });

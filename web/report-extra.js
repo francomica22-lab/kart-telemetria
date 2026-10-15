@@ -112,6 +112,191 @@
       ${tips.length ? `<ul class="why" style="margin-top:8px">${tips.map(t => `<li>En la <b>curva ${t.n}</b>, en la vuelta ${t.lap}, lo hiciste ${t.gain.toFixed(2)} s mejor que tu promedio${t.why.length ? ": " + t.why.slice(0, 2).join(" y ") : ""}. ¡Repetilo!</li>`).join("")}</ul>` : ""}</div>`;
   }
 
+  /* ---------- curva por curva: que te conviene, referencias, velocidad y trazado ---------- */
+  const mean = a => { const v = a.filter(x => x != null && isFinite(x)); return v.length ? avg(v) : null; };
+  const sd = a => { const v = a.filter(x => x != null && isFinite(x)); if (v.length < 2) return null; const m = avg(v); return Math.sqrt(v.reduce((s, x) => s + (x - m) ** 2, 0) / (v.length - 1)); };
+  const median = a => { const v = a.filter(x => x != null && isFinite(x)).sort((x, y) => x - y); return v.length ? v[Math.floor((v.length - 1) / 2)] : null; };
+  function corr(x, y) {
+    const p = x.map((xi, i) => [xi, y[i]]).filter(([a, b]) => a != null && b != null);
+    if (p.length < 6) return null;
+    const mx = avg(p.map(q => q[0])), my = avg(p.map(q => q[1]));
+    let sxy = 0, sxx = 0, syy = 0; for (const [a, b] of p) { sxy += (a - mx) * (b - my); sxx += (a - mx) ** 2; syy += (b - my) ** 2; }
+    return sxx && syy ? { r: sxy / Math.sqrt(sxx * syy), slope: sxy / sxx } : null;
+  }
+  // pasadas validas de una curva: sin las que quedaron muy lentas (trafico, trompo, boxes)
+  function cornerLaps(cv) {
+    const L = cv.por_vuelta.filter(l => l.t != null), m = median(L.map(l => l.t));
+    return L.filter(l => l.t <= m * 1.08);
+  }
+  // compara las pasadas mas rapidas con el resto y arma la receta
+  function cornerAdvice(cv, corner) {
+    const L = cornerLaps(cv).sort((a, b) => a.t - b.t), n = L.length, sa = corner.sa;
+    const best = L[0], k = Math.max(1, Math.min(3, Math.round(n / 3))), fast = L.slice(0, k), rest = L.slice(k);
+    const ref = { f: median(fast.map(l => l.f)), a: median(fast.map(l => l.a)), sv: median(fast.map(l => l.sv)), vm: mean(fast.map(l => l.vm)) };
+    const out = { n, best, k, ref, sa, pot: n > 1 ? mean(L.map(l => l.t)) - best.t : 0, spread: { f: sd(L.map(l => l.f)), a: sd(L.map(l => l.a)), sv: sd(L.map(l => l.sv)) } };
+    if (n < 4 || !rest.length) { out.title = "Pocas vueltas para comparar"; out.text = "Hacen falta al menos 4 pasadas parecidas por esta curva para saber qué te conviene."; return out; }
+    const d = key => { const a = mean(fast.map(l => l[key])), b = mean(rest.map(l => l[key])); return a != null && b != null ? a - b : 0; };
+    const dF = d("f"), dA = d("a"), dVm = d("vm"), dVg = d("vg"), dVs = d("vs"), gain = mean(rest.map(l => l.t)) - mean(fast.map(l => l.t));
+    const late = dF >= 2.5, early = dF <= -2.5, gasE = dA <= -2.5, gasL = dA >= 2.5;
+    const fm = `${f0(dF)} m`, am = `${f0(dA)} m`, g = `${gain.toFixed(2)} s`;
+    if (late && !gasL) { out.kind = "tarde"; out.title = "Frená más tarde"; out.text = `En tus pasadas más rápidas frenaste ${fm} más tarde${gasE ? ` y además aceleraste ${am} antes` : " y aceleraste en el mismo lugar"}. Frenar pasado no te arruinó la salida: ganaste ${g}.`; }
+    else if (late && gasL) { out.kind = "tarde"; out.title = "Frená pasado, aunque acelerés después"; out.text = `En las rápidas frenaste ${fm} más tarde y aceleraste ${am} más tarde. La velocidad que metés adentro (${sgn(dVm, 1)} km/h en el vértice) compensa la salida: ganaste ${g}.`; }
+    else if (early && gasE) { out.kind = "antes"; out.title = "Frená antes y acelerá antes"; out.text = `En las rápidas frenaste ${fm} antes pero aceleraste ${am} antes y saliste ${sgn(dVs, 1)} km/h. Lo que perdés en la entrada lo recuperás de sobra en la salida: ganaste ${g}.`; }
+    else if (early) { out.kind = "antes"; out.title = "No la frenes tan pasado"; out.text = `En las rápidas frenaste ${fm} antes y llegaste más ordenado al vértice (${sgn(dVm, 1)} km/h). Cuando frenás tarde te pasás y perdés: frenando antes ganaste ${g}.`; }
+    else if (gasE) { out.kind = "salida"; out.title = "Acelerá antes"; out.text = `La frenada es la misma: la diferencia está en la salida. En las rápidas aceleraste ${am} antes y saliste ${sgn(dVs, 1)} km/h: ganaste ${g}.`; }
+    else if (dVm >= 1 || dVg >= 1.5) { out.kind = "medio"; out.title = "Llevá más velocidad adentro"; out.text = `Frenás y acelerás en el mismo lugar, pero en las rápidas ${dVm >= 1 ? `pasaste ${sgn(dVm, 1)} km/h por el vértice` : `empezaste a girar ${sgn(dVg, 1)} km/h más rápido`}: soltá el freno antes y dejá correr el kart. Ganaste ${g}.`; }
+    else { out.kind = "parejo"; out.title = "Tus pasadas son parecidas"; out.text = `Entre tus pasadas rápidas y las demás hay ${g} y no aparece una diferencia clara de frenada ni de aceleración. Fijá las referencias de abajo y buscá la línea de tu mejor pasada.`; }
+    const cf = corr(L.map(l => l.f), L.map(l => l.t));
+    if (cf && Math.abs(cf.r) >= 0.4) out.corr = `Mirando todas tus vueltas, las que frenaste más tarde salieron más ${cf.slope < 0 ? "rápidas" : "lentas"}: unos ${f0(Math.abs(cf.slope) * 1000)} ms por cada metro.`;
+    return out;
+  }
+  // posicion relativa al vertice
+  const relV = (s, sa) => s == null ? "–" : Math.abs(s - sa) < 3 ? "en el vértice" : s < sa ? `${f0(sa - s)} m antes del vértice` : `${f0(s - sa)} m después del vértice`;
+
+  function curvaTool(ctx) {
+    const { D, IDS } = ctx;
+    if (!D.corners || !D.corners[0] || !D.corners[0].geo || !IDS.some(id => D.optimo[id] && D.optimo[id].curvas[0].trazas)) return "";
+    return `<div class="panel cvt"><div class="cvt-head"><div><div class="eyebrow">Curva por curva</div><h2>Qué te conviene en cada curva</h2></div>
+      ${IDS.length > 1 ? `<label class="cvt-sel">Tanda <select data-cv="ses">${IDS.map(id => `<option value="${id}">${esc(ctx.NAME(id))}</option>`).join("")}</select></label>` : ""}</div>
+      <div class="cvt-curvas" role="tablist"></div><div class="cvt-body"></div></div>`;
+  }
+
+  function wireCurva(ctx, box) {
+    const root = box.querySelector(".cvt"); if (!root) return;
+    const { D, IDS } = ctx, C = D.corners, sentido = n => ((D.circuito || {}).curvas || []).find(c => c.n == n);
+    let sid = IDS[0], cn = null, cmp = null, zoom = 1;
+    const curvaBtns = () => {
+      const rows = D.optimo[sid].curvas.map(cv => ({ n: cv.n, g: cornerAdvice(cv, C.find(c => c.n == cv.n)).pot }));
+      if (cn == null) cn = rows.slice().sort((a, b) => b.g - a.g)[0].n;   // arranca por la curva con mas para ganar
+      root.querySelector(".cvt-curvas").innerHTML = rows.map(r => `<button role="tab" data-n="${r.n}" class="${r.n == cn ? "on" : ""}" title="Tu promedio en esta curva está ${r.g.toFixed(2)} s arriba de tu mejor pasada (sin contar pasadas con tráfico o errores)"><b>Curva ${r.n}</b><small>${r.g >= 0.005 ? "−" + r.g.toFixed(2) + " s" : "="}</small></button>`).join("");
+      root.querySelectorAll(".cvt-curvas button").forEach(b => b.addEventListener("click", () => { cn = +b.dataset.n; cmp = null; render(); }));
+    };
+    const render = () => {
+      curvaBtns();
+      const cv = D.optimo[sid].curvas.find(c => c.n == cn), corner = C.find(c => c.n == cn), A = cornerAdvice(cv, corner), sc = sentido(cn);
+      const laps = cornerLaps(cv).sort((a, b) => a.t - b.t), bl = A.best, tip = laps[Math.floor(laps.length / 2)];
+      if (cmp == null || !laps.some(l => l.lap == cmp && l.lap != bl.lap)) cmp = laps.length > 1 ? (tip.lap != bl.lap ? tip.lap : laps[1].lap) : bl.lap;
+      const cl = cv.por_vuelta.find(l => l.lap == cmp);
+      const refRow = (lbl, s, spread, extra = "") => `<tr><td>${lbl}</td><td><b>${relV(s, A.sa)}</b>${extra}</td><td class="muted">${spread != null ? `±${spread.toFixed(0)} m` : ""}</td></tr>`;
+      root.querySelector(".cvt-body").innerHTML = `
+        <div class="cvt-top">
+          <div class="cvt-rec">
+            <div class="small ink2">Curva ${cn}${sc ? ` · ${sc.sentido} · ${sc.giro}°` : ""} · mejor pasada ${A.best.t.toFixed(3)} s (vuelta ${A.best.lap}) · promedio ${(A.best.t + A.pot).toFixed(3)} s</div>
+            <h3 class="cvt-title">${A.title}</h3>
+            <p>${A.text}</p>${A.corr ? `<p class="small ink2">${A.corr}</p>` : ""}
+            <div class="eyebrow" style="margin-top:12px">Tus referencias${A.k > 1 ? ` · tus ${A.k} pasadas más rápidas` : ""}</div>
+            <table class="cvt-ref"><thead><tr><th></th><th>Dónde</th><th title="Cuánto varía de una vuelta a otra">Varía</th></tr></thead><tbody>
+              ${refRow("Frenada", A.ref.f, A.spread.f)}
+              ${refRow("Vértice", A.ref.sv, A.spread.sv, A.ref.vm != null ? ` · ${A.ref.vm.toFixed(1)} km/h` : "")}
+              ${refRow("Acelerador", A.ref.a, A.spread.a)}
+            </tbody></table>
+            ${A.spread.f != null && A.spread.f >= 4 ? `<p class="small cvt-warn">Tu frenada se mueve ±${A.spread.f.toFixed(0)} m de una vuelta a otra: elegí una referencia fija (cartel, cordón, una marca en la pista) y frená siempre ahí.</p>` : ""}
+          </div>
+          <div class="cvt-mapbox"><div class="cvt-maphead"><span class="eyebrow">Trazado</span><button class="link" data-cv="zoom">${zoom > 1 ? "ver a escala real" : "ampliar diferencias ×4"}</button></div>
+            <svg class="cvt-map"></svg>
+            <div class="cvt-leg"><span><i style="background:var(--good)"></i>Ideal: tu mejor pasada (V${bl.lap})</span>${cmp != bl.lap ? `<span><i style="background:var(--s1)"></i>Vuelta ${cmp}</span>` : ""}</div>
+            <p class="small ink2">${zoom > 1 ? "Las diferencias de línea están ampliadas 4 veces para que se vean." : "Línea según el GPS (precisión de 1 a 2 m). La franja gris es la pista aproximada."}</p></div>
+        </div>
+        <div class="cvt-chhead"><span class="eyebrow">Velocidad en la curva</span>
+          ${laps.length > 1 ? `<label class="cvt-sel">Comparar con <select data-cv="cmp">${laps.filter(l => l.lap != bl.lap).map(l => `<option value="${l.lap}" ${l.lap == cmp ? "selected" : ""}>vuelta ${l.lap} · ${l.t.toFixed(3)} s${l.lap == tip.lap ? " (típica)" : ""}</option>`).join("")}</select></label>` : ""}</div>
+        <svg class="cvt-chart"></svg>
+        <p class="small ink2">F: empieza a frenar · V: vértice · A: vuelve a acelerar. Abajo, la línea azul es el tiempo que la vuelta ${cmp} pierde (sube) o gana (baja) contra tu mejor pasada, metro a metro. Pasá el mouse para ver los valores.</p>`;
+      const sel = root.querySelector('[data-cv="cmp"]'); if (sel) sel.addEventListener("change", () => { cmp = +sel.value; render(); });
+      root.querySelector('[data-cv="zoom"]').addEventListener("click", () => { zoom = zoom > 1 ? 1 : 4; render(); });
+      drawCurvaChart(root.querySelector(".cvt-chart"), corner, cv, bl, cl);
+      drawCurvaMap(root.querySelector(".cvt-map"), corner, cv, bl, cl, zoom);
+    };
+    const ss = root.querySelector('[data-cv="ses"]'); if (ss) ss.addEventListener("change", () => { sid = ss.value; cn = null; cmp = null; render(); });
+    render();
+    return { go(n, id) { if (id && id != sid) { sid = id; if (ss) ss.value = id; } cn = n; cmp = null; render(); root.scrollIntoView({ behavior: "smooth", block: "start" }); } };
+  }
+  // receta corta de una curva (para las listas del analisis simple)
+  function cornerTip(D, sid, n) {
+    const op = D.optimo[sid], cv = op && op.curvas.find(c => c.n == n), corner = (D.corners || []).find(c => c.n == n);
+    return cv && corner && cv.por_vuelta[0] && "f" in cv.por_vuelta[0] ? cornerAdvice(cv, corner) : null;
+  }
+
+  // grilla de la curva: distancia relativa al vertice
+  const gridOf = (corner, n) => { const g = corner.geo, o = []; for (let i = 0; i < n; i++) o.push(g.s0 + i * g.ds - corner.sa); return o; };
+  const idxOf = (corner, s) => s == null ? -1 : Math.round((s - corner.geo.s0) / corner.geo.ds);
+  // la salida se corta a una distancia razonable del vertice (la recta entera no aporta)
+  const nShow = (corner, n) => Math.min(n, Math.round((corner.sa + Math.max(80, 1.3 * (corner.sa - corner.geo.s0)) - corner.geo.s0) / corner.geo.ds) + 1);
+  const cut = (t, n) => ({ v: t.v.slice(0, n), o: t.o.slice(0, n) });
+
+  function drawCurvaChart(svg, corner, cv, bl, cl) {
+    const W = Math.max(600, Math.round(svg.getBoundingClientRect().width) || 900), H = 330, PL = 46, PR = 14, PT = 14, HV = 210, PB = 26;
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    if (!cv.trazas[bl.lap] || !cv.trazas[cl.lap]) return;
+    const n = nShow(corner, cv.trazas[bl.lap].v.length), tb = cut(cv.trazas[bl.lap], n), tc = cut(cv.trazas[cl.lap], n);
+    const x = gridOf(corner, n), all = tb.v.concat(tc.v), st = Math.max(...all) - Math.min(...all) > 50 ? 20 : 10;
+    const vmin = Math.floor(Math.min(...all) / st) * st, vmax = Math.ceil(Math.max(...all) / st) * st;
+    const X = v => PL + (v - x[0]) / (x[x.length - 1] - x[0]) * (W - PL - PR), Y = v => PT + (1 - (v - vmin) / (vmax - vmin)) * (HV - PT);
+    // tiempo acumulado (dt = ds / v) y diferencia contra la mejor
+    const cum = v => { let t = 0; return v.map((s, i) => (i ? (t += corner.geo.ds / Math.max((s + v[i - 1]) / 2 / 3.6, 1)) : 0)); };
+    const cb = cum(tb.v), dt = cum(tc.v).map((t, i) => t - cb[i]), dmax = Math.max(0.05, ...dt.map(Math.abs));
+    const Y0 = HV + 24, Y1 = H - PB, YD = v => (Y0 + Y1) / 2 - v / dmax * (Y1 - Y0) / 2;
+    for (let t = vmin; t <= vmax; t += st) { el("line", { x1: PL, x2: W - PR, y1: Y(t), y2: Y(t), stroke: "var(--grid)" }, svg); txt(svg, PL - 6, Y(t) + 4, t.toFixed(0), { "text-anchor": "end", class: "ax" }); }
+    for (let m = Math.ceil(x[0] / 20) * 20; m <= x[x.length - 1]; m += 20) { el("line", { x1: X(m), x2: X(m), y1: PT, y2: Y1, stroke: m == 0 ? "var(--line)" : "var(--grid)" }, svg); txt(svg, X(m), H - 8, m == 0 ? "vértice" : (m > 0 ? "+" : "") + m + " m", { "text-anchor": "middle", class: "ax" }); }
+    el("line", { x1: PL, x2: W - PR, y1: YD(0), y2: YD(0), stroke: "var(--line)" }, svg);
+    txt(svg, PL - 6, YD(0) + 4, "0 s", { "text-anchor": "end", class: "ax" });
+    txt(svg, PL - 6, Y0 + 4, `+${dmax.toFixed(2)}`, { "text-anchor": "end", class: "ax" });
+    txt(svg, PL - 6, Y1 + 4, `−${dmax.toFixed(2)}`, { "text-anchor": "end", class: "ax" });
+    txt(svg, PL + 4, Y0 - 6, "diferencia de tiempo", { class: "ax" });
+    el("polyline", { points: dt.map((d, i) => `${X(x[i]).toFixed(1)},${YD(d).toFixed(1)}`).join(" "), fill: "none", stroke: "var(--s1)", "stroke-width": 2 }, svg);
+    const dl = dt[dt.length - 1];
+    txt(svg, W - PR, YD(dl) + (dl > 0 ? -6 : 16), `${sgn(dl)} s`, { "text-anchor": "end", style: `fill:${dl > 0 ? "var(--bad)" : "var(--good)"};font-weight:600;font-size:13px` });
+    const line = (v, col, w) => el("polyline", { points: v.map((s, i) => `${X(x[i]).toFixed(1)},${Y(s).toFixed(1)}`).join(" "), fill: "none", stroke: col, "stroke-width": w, "stroke-linejoin": "round" }, svg);
+    if (cl.lap != bl.lap) line(tc.v, "var(--s1)", 2);
+    line(tb.v, "var(--good)", 2.5);
+    const mark = (l, v, col, up) => {
+      for (const [k, lbl] of [["f", "F"], ["sv", "V"], ["a", "A"]]) {
+        const i = idxOf(corner, l[k]); if (i < 0 || i >= v.length) continue;
+        el("circle", { cx: X(x[i]), cy: Y(v[i]), r: 4, fill: col, stroke: "var(--panel)", "stroke-width": 1.5 }, svg);
+        txt(svg, X(x[i]), Y(v[i]) + (up ? -9 : 18), lbl, { "text-anchor": "middle", style: `fill:${col};font-weight:700;font-size:12px;paint-order:stroke;stroke:var(--panel);stroke-width:3px` });
+      }
+    };
+    if (cl.lap != bl.lap) mark(cl, tc.v, "var(--s1)", false);
+    mark(bl, tb.v, "var(--good)", true);
+    // cursor
+    const cur = el("line", { y1: PT, y2: Y1, stroke: "var(--ink2)", "stroke-dasharray": "3 3", opacity: 0 }, svg);
+    const lab = txt(svg, 0, PT + 4, "", { class: "ax", style: "fill:var(--ink);font-size:12px;paint-order:stroke;stroke:var(--panel);stroke-width:4px" });
+    const hit = el("rect", { x: PL, y: PT, width: W - PL - PR, height: Y1 - PT, fill: "transparent" }, svg);
+    hit.addEventListener("pointermove", e => {
+      const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) / r.width * W, i = Math.max(0, Math.min(x.length - 1, Math.round((px - PL) / (W - PL - PR) * (x.length - 1))));
+      cur.setAttribute("x1", X(x[i])); cur.setAttribute("x2", X(x[i])); cur.setAttribute("opacity", 1);
+      lab.setAttribute("x", Math.min(X(x[i]) + 6, W - 330));
+      lab.textContent = `${x[i] <= 0 ? f0(x[i]) + " m antes" : f0(x[i]) + " m después"} · mejor ${tb.v[i].toFixed(1)} · V${cl.lap} ${tc.v[i].toFixed(1)} km/h · ${sgn(dt[i])} s`;
+    });
+    hit.addEventListener("pointerleave", () => { cur.setAttribute("opacity", 0); lab.textContent = ""; });
+  }
+
+  function drawCurvaMap(svg, corner, cv, bl, cl, zoom) {
+    if (!cv.trazas[bl.lap] || !cv.trazas[cl.lap]) return;
+    const n = nShow(corner, cv.trazas[bl.lap].v.length), tb = cut(cv.trazas[bl.lap], n), tc = cut(cv.trazas[cl.lap], n), g0 = corner.geo;
+    const g = { x: g0.x.slice(0, n), y: g0.y.slice(0, n), nx: g0.nx, ny: g0.ny };
+    const pts = o => g.x.map((x, i) => [x + o[i] * zoom * g.nx[i], -(g.y[i] + o[i] * zoom * g.ny[i])]);
+    const P0 = g.x.map((x, i) => [x, -g.y[i]]), Pb = pts(tb.o), Pc = pts(tc.o), all = P0.concat(Pb, Pc);
+    const pad = 12, x0 = Math.min(...all.map(p => p[0])) - pad, x1 = Math.max(...all.map(p => p[0])) + pad, y0 = Math.min(...all.map(p => p[1])) - pad, y1 = Math.max(...all.map(p => p[1])) + pad;
+    svg.setAttribute("viewBox", `${x0.toFixed(1)} ${y0.toFixed(1)} ${(x1 - x0).toFixed(1)} ${(y1 - y0).toFixed(1)}`);
+    const u = Math.max(x1 - x0, y1 - y0) / 320;   // un "pixel" en metros, para trazos y textos
+    const pl = (P, a) => el("polyline", Object.assign({ points: P.map(p => p[0].toFixed(1) + "," + p[1].toFixed(1)).join(" "), fill: "none", "stroke-linejoin": "round", "stroke-linecap": "round" }, a), svg);
+    if (zoom == 1) pl(P0, { stroke: "var(--line)", "stroke-width": 9 });   // pista aproximada: 9 m de ancho
+    if (cl.lap != bl.lap) pl(Pc, { stroke: "var(--s1)", "stroke-width": 2.2 * u });
+    pl(Pb, { stroke: "var(--good)", "stroke-width": 3 * u });
+    // sentido de marcha
+    const a = Pb[0], b = Pb[Math.min(4, Pb.length - 1)], ang = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI;
+    el("path", { d: `M ${-7 * u} ${-6 * u} L ${7 * u} 0 L ${-7 * u} ${6 * u} Z`, fill: "var(--ink2)", transform: `translate(${a[0]} ${a[1]}) rotate(${ang})` }, svg);
+    const mark = (l, P, col, side) => {
+      for (const [k, lbl] of [["f", "F"], ["sv", "V"], ["a", "A"]]) {
+        const i = idxOf(corner, l[k]); if (i < 0 || i >= P.length) continue;
+        el("circle", { cx: P[i][0], cy: P[i][1], r: 4.5 * u, fill: col, stroke: "var(--panel)", "stroke-width": 1.5 * u }, svg);
+        txt(svg, P[i][0] + side * 8 * u, P[i][1] + 4 * u, lbl, { "text-anchor": side > 0 ? "start" : "end", style: `fill:${col};font-weight:700;font-size:${13 * u}px;paint-order:stroke;stroke:var(--panel);stroke-width:${3 * u}px` });
+      }
+    };
+    if (cl.lap != bl.lap) mark(cl, Pc, "var(--s1)", -1);
+    mark(bl, Pb, "var(--good)", 1);
+  }
+
   /* ---------- potencia ---------- */
   function powerOf(b, P) { const g = 9.81; return (P.m * b.acc * g + 0.5 * P.rho * P.cda * b.v * b.v + P.crr * P.m * g) * b.v / 745.7; }
   function powerCurve(bins) { return (bins || []).filter(b => b.n >= 25 && b.vueltas >= 2); }
@@ -840,5 +1025,5 @@
     root.querySelector(".csim").innerHTML = others.length ? `<div class="tw"><table><thead><tr><th>Circuito</th><th>Parecido</th><th>Largo</th><th>V media</th><th>Curvas</th><th>Agarre</th></tr></thead><tbody>${others.map(o => `<tr title="${esc(o.resumen)}"><td>${esc(o.nombre || "–")}</td><td class="${o.sim >= 75 ? "g" : ""}">${o.sim}%</td><td>${o.largo} m</td><td>${o.v_media} km/h</td><td>${o.curvas}</td><td>${o.grip} g</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted small">Todavía no hay otros circuitos guardados. Cuando analices tandas de otra pista, aparece acá cuánto se parece a ${esc(c.nombre || "esta")}.</p>`;
   }
 
-  window.KTX = { circuitPane, wireCircuit, circuitSummary, audioSpectrum, spectralSync, setupDiff, setupChips, setupModal, climaTxt, optimoPane, simpleOptimo, optimoTips, lapTrend, powerPanel, drawPower, hpDelta, carbPanel, carbSimple, wireCarb, carbCorto, transPane, wireTrans, sensorsPane, drawWater, videoPane, wireVideo, store };
+  window.KTX = { circuitPane, wireCircuit, circuitSummary, audioSpectrum, spectralSync, setupDiff, setupChips, setupModal, climaTxt, optimoPane, simpleOptimo, optimoTips, lapTrend, curvaTool, wireCurva, cornerTip, powerPanel, drawPower, hpDelta, carbPanel, carbSimple, wireCarb, carbCorto, transPane, wireTrans, sensorsPane, drawWater, videoPane, wireVideo, store };
 })();

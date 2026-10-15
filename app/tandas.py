@@ -135,6 +135,30 @@ def sectors(rdf, sec_traces, L, options=(3, 4)):
     return res
 
 
+def _r(x, nd):
+    return None if x is None or pd.isna(x) else round(float(x), nd)
+
+
+CURVA_DS = 2.0   # metros entre puntos de las trazas por curva (herramienta "curva por curva")
+
+
+def corner_geo(ref, c):
+    """Trazado de la referencia en la curva, con la normal hacia la izquierda (para dibujar cada linea con su desvio)."""
+    s = np.arange(c["s_start"], c["s_end"], CURVA_DS)
+    x, y = np.interp(s, ref.s, ref.x), np.interp(s, ref.s, ref.y)
+    nx, ny = -np.gradient(y), np.gradient(x)
+    nn = np.hypot(nx, ny); nn[nn == 0] = 1
+    return dict(s0=round(float(s[0]), 1), ds=CURVA_DS, x=np.round(x, 1).tolist(), y=np.round(y, 1).tolist(),
+                nx=np.round(nx / nn, 3).tolist(), ny=np.round(ny / nn, 3).tolist())
+
+
+def corner_traces(traces, c):
+    """Velocidad y desvio lateral de cada vuelta en la curva, sobre la grilla de corner_geo."""
+    s = np.arange(c["s_start"], c["s_end"], CURVA_DS)
+    return {str(lap): dict(v=np.round(np.interp(s, d.s, d.speed), 1).tolist(),
+                           o=np.round(np.interp(s, d.s, d.off.fillna(0)), 1).tolist()) for lap, d in traces.items()}
+
+
 def optimal(Rs, ses, pool):
     """Vuelta optima y regularidad de una tanda: mejor version de cada curva vs el promedio de la tanda."""
     keys = ["tiempo", "v_min", "s_vmin", "v_salida", "freno_max", "s_freno", "s_acel", "lat_max"]
@@ -157,7 +181,9 @@ def optimal(Rs, ses, pool):
             prom_metricas={k: (None if pd.isna(avg[k]) else round(float(avg[k]), 2)) for k in keys},
             desvio_vertice=round(float(q.s_vmin.std(ddof=1)), 1) if len(q) > 1 else 0.0,
             desvio_freno=round(float(q.s_freno.std(ddof=1)), 1) if len(q) > 1 and q.s_freno.notna().sum() > 1 else None,
-            por_vuelta=[dict(lap=int(r.lap), t=round(float(r.tiempo), 3)) for r in q.sort_values("lap").itertuples()]))
+            por_vuelta=[dict(lap=int(r.lap), t=round(float(r.tiempo), 3), f=_r(r.s_freno, 1), lv=_r(r.s_levanta, 1), a=_r(r.s_acel, 1),
+                             sv=_r(r.s_vmin, 1), vm=_r(r.v_min, 1), vg=_r(r.v_giro, 1), vs=_r(r.v_salida, 1), fm=_r(r.freno_max, 2))
+                        for r in q.sort_values("lap").itertuples()]))
     out["optima"] = round(total, 3)
     return out
 
@@ -327,6 +353,12 @@ def build_data(paths, top=3, bands=None, log=print):
     out["circuito"] = circuito.circuit_profile(rdf, corners, R, [d for tr, _ in sec_traces.values() for d in tr.values()], float(ref_lap.time))
     out["circuito"].update(nombre=S[ref_id].get("venue"), lat=S[ref_id].get("lat0"), lon=S[ref_id].get("lon0"))
     out["optimo"] = {sid: optimal(R[R.ses == sid], S[sid], rap_by[sid]) for sid in S}
+    for c, oc in zip(corners, out["corners"]):
+        oc["geo"] = corner_geo(ref, c)
+    for sid in S:
+        byn = {c["n"]: c for c in corners}
+        for cv in out["optimo"][sid]["curvas"]:
+            cv["trazas"] = corner_traces(sec_traces[sid][0], byn[cv["n"]])
     out["setup_fields"] = [list(f) for f in setup_kart.FIELDS]
     # motor: hace falta RPM en todas las tandas (hay MyChron sin el cable de RPM). Si falta o falla, el resto del
     # analisis (curvas, vuelta optima, circuito) sigue igual y la interfaz avisa.

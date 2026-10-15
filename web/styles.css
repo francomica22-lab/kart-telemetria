@@ -510,3 +510,36 @@ p.foot{background:none;border:0;padding:0;max-width:none}
 .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
 .gbtn svg{width:18px!important;height:18px!important;flex:none;max-width:18px}
 .gbtn{padding:10px 14px;min-height:0}
+/* curva por curva (analisis simple) */
+.cvt{display:grid;gap:12px}
+.cvt-head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.cvt-head h2{font-size:20px;margin-top:2px}
+.cvt-sel{font-size:12.5px;color:var(--muted);display:inline-flex;gap:6px;align-items:center}
+.cvt-sel select{background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 8px;font-size:13px}
+.cvt-curvas{display:flex;flex-wrap:wrap;gap:6px}
+.cvt-curvas button{display:grid;gap:1px;text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 12px;cursor:pointer;color:var(--ink2)}
+.cvt-curvas button b{font:600 14px var(--display);letter-spacing:.03em}
+.cvt-curvas button small{font:500 11.5px var(--mono);color:var(--good)}
+.cvt-curvas button:hover{background:var(--hover)}
+.cvt-curvas button.on{background:var(--ink);border-color:var(--ink);color:#0d1015}
+.cvt-curvas button.on small{color:#1d6b2b}
+.cvt-top{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;align-items:start}
+.cvt-rec p{margin:6px 0 0;line-height:1.5;max-width:70ch}
+.cvt-title{font-size:24px;margin-top:8px;color:var(--ink)}
+.cvt-ref{border-collapse:collapse;margin-top:6px;font-size:14px;width:100%;max-width:520px}
+.cvt-ref th{font:600 11px var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:left;padding:4px 10px 4px 0}
+.cvt-ref td{padding:7px 10px 7px 0;border-top:1px solid var(--line);text-align:left;font-family:inherit}
+.cvt-ref td b{font-weight:600}
+.cvt-ref td:first-child{color:var(--ink2);width:90px}
+.cvt-warn{color:var(--warn);margin-top:10px}
+.cvt-mapbox{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:grid;gap:6px}
+.cvt-maphead{display:flex;justify-content:space-between;align-items:center}
+.cvt-map{width:100%;height:300px;display:block}
+.cvt-leg{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--ink2)}
+.cvt-leg i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.cvt-chhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:4px}
+.cvt-chart{width:100%;height:auto;display:block}
+.cvt-chart .ax{fill:var(--muted);font-size:11.5px;font-family:var(--mono)}
+ol.todo > li.go{cursor:pointer;border-radius:6px}
+ol.todo > li.go:hover b{text-decoration:underline}
+@media (max-width:900px){.cvt-top{grid-template-columns:1fr}.cvt-map{height:240px}}
