@@ -82,7 +82,10 @@ Entrá a <https://supabase.com/dashboard> → proyecto **kart-telemetria** (¡no
 Cuando estén 1, 2 y 3 (Lemon Squeezy puede venir después: el botón de dólares muestra "todavía no está habilitado"), me decís **"publicá"** y yo:
 
 1. Uno la rama `suscripciones` a la principal y publico la versión **2.0.0** (web + programa).
-2. Doy un plan Pro de cortesía a quien me digas (amigos que ya la usan), desde el panel de administración.
+2. Aplico `supabase/lanzamiento.sql`: crear links compartidos pasa a exigir plan Pro también en el servidor (antes de publicar no se puede, porque la 1.9 comparte sin cuenta).
+3. Doy un plan Pro de cortesía a quien me digas (amigos que ya la usan), desde el panel de administración.
+
+Para tener en cuenta: cada mail nuevo tiene 7 días de prueba, así que alguien podría ir creando cuentas para seguir gratis. Para arrancar no vale la pena complicarlo. Si pasa, se puede limitar por equipo.
 
 ---
 

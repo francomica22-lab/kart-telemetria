@@ -23,8 +23,12 @@
     return c;
   }
   async function crear(D, conPiloto) {
-    const r = await fetch(BASE + "crear_compartido", { method: "POST", headers: { apikey: KEY, "Content-Type": "application/json" }, body: JSON.stringify({ p_data: slim(D, conPiloto) }) });
-    if (!r.ok) throw new Error(r.status == 400 ? "el reporte es demasiado grande" : "no se pudo subir (" + r.status + ")");
+    const t = window.KTA ? await KTA.token().catch(() => null) : null;
+    const r = await fetch(BASE + "crear_compartido", { method: "POST", headers: Object.assign({ apikey: KEY, "Content-Type": "application/json" }, t ? { Authorization: "Bearer " + t } : {}), body: JSON.stringify({ p_data: slim(D, conPiloto) }) });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      throw new Error(/plan Pro|ingresa/.test(j.message || "") ? j.message : r.status == 400 ? "el reporte es demasiado grande" : "no se pudo subir (" + r.status + ")");
+    }
     return (await r.json()).toString();
   }
   async function ver(id) {

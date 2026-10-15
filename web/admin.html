@@ -111,20 +111,23 @@
         tabla(["Fecha", "Mail", "Tipo", "Comentario", "Medio", "Estado", ""], D.pedidos_baja.map(p => `<tr><td>${f(p.creado)}</td><td>${esc(p.email)}</td><td>${p.tipo == "arrepentimiento" ? "<span class='tag b'>arrepentimiento</span>" : "baja"}</td>
           <td class="wrap">${esc(p.motivo || "")}</td><td>${esc(p.proveedor || "–")} ${esc(p.proveedor_ref || "")}</td><td>${p.estado == "pendiente" ? "<span class='tag w'>pendiente</span>" : "<span class='tag g'>resuelto</span>"}</td>
           <td>${p.estado == "pendiente" ? `<button class="btn small" data-res="${p.id}">Marcar resuelto</button>` : ""}</td></tr>`));
-      tb.querySelectorAll("[data-res]").forEach(b => b.addEventListener("click", async () => { b.disabled = true; await rpc("admin_resolver_pedido", { p_id: +b.dataset.res }); cargar(); }));
+      tb.querySelectorAll("[data-res]").forEach(b => b.addEventListener("click", async () => {
+        b.disabled = true;
+        try { await rpc("admin_resolver_pedido", { p_id: +b.dataset.res }); cargar(); } catch (er) { b.disabled = false; alert("No se pudo: " + er.message); }
+      }));
     } else if (tab == "circuitos") {
-      tb.innerHTML = tabla(["Circuito", "Tandas", "Equipos", "Mejor tiempo", "Desde", "Hasta", "Categorías"], D.circuitos.map(c => `<tr><td>${esc(c.circuito)}</td><td>${c.tandas}</td><td>${c.equipos}</td>
+      tb.innerHTML = tabla(["Circuito", "Tandas", "Equipos", "Mejor tiempo", "Desde", "Hasta", "Categorías"], D.circuitos.map(c => `<tr><td>${esc(c.circuito)}</td><td>${esc(c.tandas)}</td><td>${esc(c.equipos)}</td>
         <td class="num">${c.mejor != null ? (+c.mejor).toFixed(3) : "–"}</td><td>${fd(c.desde)}</td><td>${fd(c.hasta)}</td><td>${esc((c.categorias || []).join(", "))}</td></tr>`));
     } else if (tab == "tandas") {
       tb.innerHTML = `<p class="small ink2">Resúmenes anónimos enviados por la app (últimos 500). No están vinculados a ninguna cuenta.</p>` +
         tabla(["Recibido", "Circuito", "Fecha", "Hora", "Categoría", "Chasis", "Motor", "Mejor", "Prom.", "Vueltas", "HP", "Fallas", "Versión", "Equipo", "Setup / clima"], D.envios.map(e => `<tr><td>${f(e.created_at)}</td><td>${esc(e.circuito)}</td><td>${fd(e.fecha)}</td><td>${esc(e.hora || "")}</td>
           <td>${esc(e.categoria || "")}</td><td>${esc(e.chasis || "")}</td><td>${esc(e.motor || "")}</td><td class="num">${e.mejor_tiempo != null ? (+e.mejor_tiempo).toFixed(3) : "–"}</td><td class="num">${e.promedio != null ? (+e.promedio).toFixed(3) : "–"}</td>
-          <td>${e.vueltas ?? ""}</td><td>${e.potencia_hp != null ? (+e.potencia_hp).toFixed(1) : ""}</td><td>${e.fallas_motor || ""}</td><td>${esc(e.app_version || "")} ${esc(e.plataforma || "")}</td><td class="muted">${esc(String(e.dispositivo || "").slice(0, 8))}</td>
+          <td>${esc(e.vueltas ?? "")}</td><td>${e.potencia_hp != null ? (+e.potencia_hp).toFixed(1) : ""}</td><td>${esc(e.fallas_motor || "")}</td><td>${esc(e.app_version || "")} ${esc(e.plataforma || "")}</td><td class="muted">${esc(String(e.dispositivo || "").slice(0, 8))}</td>
           <td><details class="js"><summary class="small">ver</summary><pre>${esc(JSON.stringify({ setup: e.setup, clima: e.clima }, null, 1))}</pre></details></td></tr>`));
     } else if (tab == "compartidos") {
       const C = D.compartidos;
       tb.innerHTML = `<p class="small ink2">${C.total} links activos · ${C.vistas} vistas · ${mb(C.bytes)}. Vencen solos a los 30 días.</p>` +
-        tabla(["Creado", "Reporte", "Vistas", "Tamaño", "Vence", ""], C.lista.map(c => `<tr><td>${f(c.creado)}</td><td>${esc(c.titulo || "")}</td><td>${c.vistas}</td><td>${mb(c.bytes)}</td><td>${fd(c.vence)}</td>
+        tabla(["Creado", "Reporte", "Vistas", "Tamaño", "Vence", ""], C.lista.map(c => `<tr><td>${f(c.creado)}</td><td>${esc(c.titulo || "")}</td><td>${esc(c.vistas)}</td><td>${mb(c.bytes)}</td><td>${fd(c.vence)}</td>
           <td><a href="ver.html#${esc(c.id)}" target="_blank" rel="noopener">abrir</a></td></tr>`));
     } else if (tab == "espacio") {
       tb.innerHTML = `<p class="small ink2">La base completa ocupa ${mb(D.base_bytes)}. Los archivos de telemetría de los usuarios no se guardan en el servidor: quedan en sus equipos.</p>` +

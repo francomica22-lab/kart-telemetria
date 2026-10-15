@@ -40,7 +40,7 @@
       body: body ? JSON.stringify(body) : undefined,
     });
     let j = null; try { j = await r.json(); } catch (e) { }
-    if (!r.ok) throw new Error(traducir((j && (j.msg || j.error_description || j.message || j.error)) || "error " + r.status));
+    if (!r.ok) { const e = new Error(traducir((j && (j.msg || j.error_description || j.message || j.error)) || "error " + r.status)); e.status = r.status; throw e; }
     return j;
   }
   const traducir = m => {
@@ -57,11 +57,19 @@
   /* ---------- sesion ---------- */
   const guardarSesion = j => { if (j && j.access_token) store.set("kt-auth", { at: j.access_token, rt: j.refresh_token, exp: Date.now() + (j.expires_in || 3600) * 1000, user: { id: j.user.id, email: j.user.email } }); };
   const sesion = () => store.get("kt-auth");
+  let renovando = null;
   async function token() {
     const s = sesion(); if (!s) return null;
     if (Date.now() < s.exp - 60000) return s.at;
-    try { guardarSesion(await req("/auth/v1/token?grant_type=refresh_token", { refresh_token: s.rt })); return sesion().at; }
-    catch (e) { if (navigator.onLine) { store.set("kt-auth", null); emit(); } return null; }
+    if (!renovando) renovando = (async () => {
+      try { guardarSesion(await req("/auth/v1/token?grant_type=refresh_token", { refresh_token: s.rt })); return sesion().at; }
+      catch (e) {
+        // 400/401: la sesion ya no vale (otro equipo, contrasena cambiada). Otro error = sin internet: se sigue con lo guardado
+        if (e.status == 400 || e.status == 401) { store.set("kt-auth", null); emit(); }
+        return null;
+      } finally { setTimeout(() => { renovando = null; }, 0); }
+    })();
+    return renovando;
   }
   async function crear(email, password) {
     const j = await req(`/auth/v1/signup?redirect_to=${encodeURIComponent(CUENTA_PAGE)}`, { email, password });
@@ -85,19 +93,22 @@
     if (!t) { emit(); return estado(); }
     try {
       const p = await req("/rest/v1/rpc/mi_plan", {}, t);
-      store.set("kt-plan", Object.assign({}, p, { revisado: Date.now() }));
+      store.set("kt-plan", Object.assign({}, p, { uid: p.uid || sesion().user.id, revisado: Date.now() }));
     } catch (e) { /* sin internet: queda el ultimo plan conocido */ }
     emit(); return estado();
   }
   function estado() {
-    const s = sesion(), p = store.get("kt-plan");
+    const s = sesion(); let p = store.get("kt-plan");
     if (!s) return { logueado: false, vigente: false, plan: null };
+    if (p && p.uid && p.uid != s.user.id) p = null;   // plan de otra cuenta en este equipo
     if (!p) return { logueado: true, email: s.user.email, vigente: false, plan: null, sinDatos: true };
     const vence = Date.parse(p.vence), ahora = Date.now();
     const offlineOk = ahora - (p.revisado || 0) < GRACIA_DIAS * 864e5;
-    const vigente = !!p.plan && vence > ahora && offlineOk;
+    const vigente = !!p.plan && !!PLANES[p.plan] && vence > ahora && offlineOk;
+    const inicio = p.inicio_pago ? Date.parse(p.inicio_pago) : null;
     return { logueado: true, email: s.user.email, plan: vigente ? p.plan : null, planNombre: vigente ? PLANES[p.plan].nombre : null, estado: p.estado,
-      prueba: p.estado == "prueba", vence, dias: Math.max(0, Math.ceil((vence - ahora) / 864e5)), vigente, revisarOnline: !offlineOk };
+      prueba: p.estado == "prueba", vence, dias: Math.max(0, Math.ceil((vence - ahora) / 864e5)), vigente, revisarOnline: !offlineOk,
+      pago: ["mercadopago", "lemonsqueezy"].includes(p.proveedor), arrepentible: !!inicio && ahora - inicio <= 10 * 864e5 && ["activa", "cancelada"].includes(p.estado) };
   }
   const puede = f => { const e = estado(); return e.vigente && PLANES[e.plan] && PLANES[e.plan].funciones.includes(f); };
 
@@ -157,7 +168,7 @@
         : `<div class="tile"><div class="eyebrow">Plan</div><div class="tv">${esc(e.planNombre)}${e.prueba ? " · prueba" : ""}</div><div class="ts">${e.prueba ? `te quedan ${e.dias} día${e.dias == 1 ? "" : "s"}` : `${e.estado == "cancelada" ? "cancelada, vale hasta" : "se renueva el"} ${new Date(e.vence).toLocaleDateString("es-AR")}`}</div></div>`}</div>
       ${e.revisarOnline ? `<p class="small b">Hace más de ${GRACIA_DIAS} días que el programa no se conecta: conectate a internet para seguir usándolo.</p>` : ""}
       ${p && p.portal ? `<p class="small"><a href="${esc(p.portal)}" target="_blank" rel="noopener">Facturas y medio de pago</a></p>` : ""}
-      ${e.vigente && !e.prueba && e.estado == "activa" ? `<p class="small"><button class="link" id="p-baja">Dar de baja la suscripción</button> · <button class="link" id="p-arr">Botón de arrepentimiento</button></p>` : ""}
+      ${e.pago && (e.estado == "activa" || e.arrepentible) ? `<p class="small">${e.estado == "activa" ? `<button class="link" id="p-baja">Dar de baja la suscripción</button>` : ""}${e.estado == "activa" && e.arrepentible ? " · " : ""}${e.arrepentible ? `<button class="link" id="p-arr">Botón de arrepentimiento</button>` : ""}</p>` : ""}
       <div class="mact"><button class="btn" id="p-out">Cerrar sesión</button><button class="btn" id="p-ref">Actualizar</button><button class="btn primary" id="p-planes">${e.vigente && !e.prueba ? "Cambiar de plan" : "Ver planes"}</button></div>`);
     const bb = d.querySelector("#p-baja"); if (bb) bb.addEventListener("click", () => { d.remove(); baja("baja"); });
     const ba = d.querySelector("#p-arr"); if (ba) ba.addEventListener("click", () => { d.remove(); baja("arrepentimiento"); });
@@ -175,13 +186,16 @@
       <div class="planes">${Object.entries(PLANES).map(([k, p]) => `<div class="plan${k == "pro" ? " rec" : ""}"><h3>${p.nombre}</h3><div class="pr" data-pr="${k}"></div>
         <ul>${all.map(f => `<li class="${p.funciones.includes(f) ? "" : "no"}">${p.funciones.includes(f) ? "✓" : "–"} ${fl(f)}</li>`).join("")}</ul>
         <button class="btn${k == "pro" ? " primary" : ""}" data-plan="${k}">Suscribirme</button></div>`).join("")}</div>
-      <p class="small ink2" id="pl-nota"></p><p class="small" id="pl-msg" role="status"></p>
+      <p class="small ink2" id="pl-nota"></p>
+      <label class="acct-f pl-mp"><span class="small ink2">Mail de tu cuenta de Mercado Pago (si es distinto al de esta cuenta)</span><input type="email" id="pl-em" placeholder="${esc((estado().email) || "")}" autocomplete="email"></label>
+      <p class="small" id="pl-msg" role="status"></p>
       <p class="small ink2">Se renueva sola; la cancelás cuando quieras desde tu cuenta (botón de baja). Tenés 10 días para arrepentirte y te devolvemos todo. <a href="https://francomica22-lab.github.io/kart-telemetria/terminos.html" target="_blank" rel="noopener">Términos</a></p>
       <div class="mact"><button class="btn" id="pl-x">Cerrar</button></div>`);
     const pintar = () => {
       d.querySelectorAll("[data-per]").forEach(b => b.classList.toggle("on", b.dataset.per == periodo));
       d.querySelectorAll("[data-mon]").forEach(b => b.classList.toggle("on", b.dataset.mon == moneda));
       d.querySelectorAll("[data-pr]").forEach(el => { const v = PRECIOS[moneda][el.dataset.pr][periodo]; el.innerHTML = `<b>${fmt(v, moneda)}</b> <span class="muted">/ ${periodo == "anual" ? "año" : "mes"}</span>${periodo == "anual" ? `<div class="small ink2">equivale a ${fmt(Math.round(v / 12), moneda)} por mes</div>` : ""}`; });
+      d.querySelector(".pl-mp").hidden = moneda != "ARS";
       d.querySelector("#pl-nota").textContent = moneda == "ARS" ? "Pagás con Mercado Pago (tarjeta de crédito o débito, o dinero en cuenta)." : "Pagás con tarjeta internacional (Lemon Squeezy). Los impuestos de tu país se agregan al pagar.";
     };
     d.querySelectorAll("[data-per]").forEach(b => b.addEventListener("click", () => { periodo = b.dataset.per; pintar(); }));
@@ -191,7 +205,8 @@
       if (!estado().logueado) { d.remove(); login("Ingresá para suscribirte"); return; }
       b.disabled = true; m.className = "small ink2"; m.textContent = "Abriendo el pago…";
       try {
-        const r = await fn("suscribir", { plan: b.dataset.plan, periodo, proveedor: moneda == "ARS" ? "mp" : "ls" });
+        const em = d.querySelector("#pl-em").value.trim();
+        const r = await fn("suscribir", { plan: b.dataset.plan, periodo, proveedor: moneda == "ARS" ? "mp" : "ls", email_pago: moneda == "ARS" && em ? em : undefined });
         if (!r.url) throw new Error(r.error || "No se pudo abrir el pago.");
         abrir(r.url);
         m.textContent = "Se abrió el pago en el navegador. Cuando termines, volvé acá: el plan se activa solo en un minuto.";
@@ -206,11 +221,12 @@
   let espera = null;
   function esperarPago() {
     clearInterval(espera); let n = 0;
-    const antes = JSON.stringify(store.get("kt-plan"));
+    const huella = () => { const p = store.get("kt-plan") || {}; return JSON.stringify([p.plan, p.estado, p.vence, p.periodo, p.proveedor]); };
+    const antes = huella();
     espera = setInterval(async () => {
       n++; await refrescar();
       const e = estado();
-      if (JSON.stringify(store.get("kt-plan")) != antes && e.vigente && !e.prueba) { clearInterval(espera); document.querySelectorAll(".modal").forEach(m => m.remove()); aviso(`¡Listo! Tu plan ${e.planNombre} está activo.`); }
+      if (huella() != antes && e.vigente && !e.prueba) { clearInterval(espera); document.querySelectorAll(".modal").forEach(m => m.remove()); aviso(`¡Listo! Tu plan ${e.planNombre} está activo.`); }
       if (n > 60) clearInterval(espera);
     }, 10000);
   }

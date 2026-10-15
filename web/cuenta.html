@@ -20,7 +20,7 @@
   const URL = "https://zbesblxiezcfurswanev.supabase.co", KEY = "sb_publishable_HRIpZ4BfWemVZ8TNA37-EQ_tKN1joRG";
   const box = document.getElementById("box");
   const q = new URLSearchParams(location.hash.slice(1) || location.search.slice(1));
-  const done = (t, p) => box.innerHTML = `<div class="eyebrow">Análisis Karting</div><h1>${t}</h1><p class="ink2">${p}</p>`;
+  const done = (t, p) => { box.innerHTML = `<div class="eyebrow">Análisis Karting</div><h1></h1><p class="ink2"></p>`; box.querySelector("h1").textContent = t; box.querySelector("p").textContent = p; };
   if (new URLSearchParams(location.search).get("pago") == "ok") return done("¡Gracias por suscribirte!", "Volvé al programa (o a la versión web): tu plan se activa solo en un minuto. Si no aparece, tocá tu cuenta → Actualizar.");
   if (q.get("error")) return done("El link no funcionó", (q.get("error_description") || "El link venció o ya se usó.").replace(/\+/g, " ") + " Pedí uno nuevo desde el programa.");
   const at = q.get("access_token"), type = q.get("type");
