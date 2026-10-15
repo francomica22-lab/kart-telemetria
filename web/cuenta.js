@@ -48,7 +48,7 @@
     if (/invalid login credentials/i.test(t)) return "Mail o contraseña incorrectos.";
     if (/email not confirmed/i.test(t)) return "Todavía no confirmaste el mail: tocá el link que te mandamos.";
     if (/already registered|already exists/i.test(t)) return "Ya hay una cuenta con ese mail. Ingresá o recuperá la contraseña.";
-    if (/password should be at least/i.test(t)) return "La contraseña tiene que tener al menos 6 caracteres.";
+    if (/password should be at least|password.*(weak|contain|characters)|weak.?password/i.test(t)) return "La contraseña es muy débil: usá al menos 8 caracteres, con letras y números.";
     if (/rate limit|too many/i.test(t)) return "Demasiados intentos seguidos. Esperá unos minutos.";
     if (/invalid.*email|unable to validate email/i.test(t)) return "Ese mail no es válido.";
     return t;
@@ -131,7 +131,8 @@
       <p class="ink2 small">Con una cuenta tenés <b>7 días de todo gratis</b>, sin tarjeta. Después elegís cómo querés que te hable tu ingeniero: <b>Simple</b> (fácil) o <b>Pro</b> (profesional).</p>
       <div class="seg acct-tabs" role="tablist"><button type="button" data-t="in" class="on">Ingresar</button><button type="button" data-t="up">Crear cuenta</button></div>
       <form class="acct-f"><label><span>Mail</span><input type="email" id="a-em" autocomplete="email" required></label>
-        <label><span>Contraseña</span><input type="password" id="a-pw" autocomplete="current-password" minlength="6" required></label>
+        <label><span>Contraseña</span><input type="password" id="a-pw" autocomplete="current-password" minlength="8" required></label>
+        <p class="small muted" id="a-pwh" hidden>Al menos 8 caracteres, con letras y números.</p>
         <p class="small" id="a-msg" role="status"></p>
         <div class="mact"><button type="button" class="link" id="a-rec">Olvidé mi contraseña</button><button type="button" class="btn" id="a-x">Cerrar</button><button class="btn primary" id="a-go">Ingresar</button></div></form>`);
     let modo = "in";
@@ -140,6 +141,7 @@
       modo = b.dataset.t; d.querySelectorAll(".acct-tabs button").forEach(x => x.classList.toggle("on", x == b));
       d.querySelector("#a-go").textContent = modo == "in" ? "Ingresar" : "Crear cuenta y empezar la prueba";
       d.querySelector("#a-pw").autocomplete = modo == "in" ? "current-password" : "new-password"; msg("");
+      d.querySelector("#a-pwh").hidden = modo == "in";
     }));
     d.querySelector("#a-x").addEventListener("click", () => d.remove());
     d.querySelector("#a-rec").addEventListener("click", async () => {
