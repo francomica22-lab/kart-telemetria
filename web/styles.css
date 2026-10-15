@@ -503,3 +503,4 @@ p.foot{background:none;border:0;padding:0;max-width:none}
 .pl-opts .seg button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .plan .pr b{font:700 24px var(--display)}
 .acctbox textarea{width:100%}
+.plan .lema{font:600 12px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--s2);margin-top:-6px}

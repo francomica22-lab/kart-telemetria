@@ -8,8 +8,8 @@
   const GRACIA_DIAS = 7;
   // que habilita cada plan (se puede cambiar aca sin tocar el resto)
   const PLANES = {
-    simple: { nombre: "Simple", funciones: ["analizar", "simple", "pdf"] },
-    pro: { nombre: "Pro", funciones: ["analizar", "simple", "pdf", "detallado", "link", "setup", "video"] },
+    simple: { nombre: "Simple", lema: "Te habla fácil", funciones: ["analizar", "simple", "pdf"] },
+    pro: { nombre: "Pro", lema: "Te habla como un ingeniero", funciones: ["analizar", "simple", "pdf", "detallado", "link", "setup", "video"] },
   };
   // precios mostrados (el servidor tiene los suyos y es el que cobra; mantener iguales)
   const PRECIOS = {
@@ -128,7 +128,7 @@
   }
   function login(motivo) {
     const d = modal(`<h2>${motivo ? esc(motivo) : "Tu cuenta"}</h2>
-      <p class="ink2 small">Con una cuenta tenés <b>7 días de todo gratis</b>. Después elegís el plan Simple o Pro.</p>
+      <p class="ink2 small">Con una cuenta tenés <b>7 días de todo gratis</b>, sin tarjeta. Después elegís cómo querés que te hable tu ingeniero: <b>Simple</b> (fácil) o <b>Pro</b> (profesional).</p>
       <div class="seg acct-tabs" role="tablist"><button type="button" data-t="in" class="on">Ingresar</button><button type="button" data-t="up">Crear cuenta</button></div>
       <form class="acct-f"><label><span>Mail</span><input type="email" id="a-em" autocomplete="email" required></label>
         <label><span>Contraseña</span><input type="password" id="a-pw" autocomplete="current-password" minlength="6" required></label>
@@ -177,13 +177,13 @@
     d.querySelector("#p-planes").addEventListener("click", () => { d.remove(); planes(); });
   }
   function planes(motivo) {
-    const fl = f => ({ analizar: "Analizar y comparar tandas", simple: "Análisis simple", pdf: "Exportar a PDF", detallado: "Análisis detallado (curvas, sectores, G)", link: "Compartir por link y QR", setup: "Setup y carburación", video: "Video sincronizado" }[f]);
+    const fl = f => ({ analizar: "Analizar y comparar tandas", simple: "Análisis simple: en qué curva perdés y si fuiste vos o fue el kart", pdf: "Exportar a PDF", detallado: "Análisis detallado (curvas, sectores, G)", link: "Compartir por link y QR", setup: "Setup y carburación", video: "Video sincronizado" }[f]);
     const all = PLANES.pro.funciones;
     let periodo = "anual", moneda = enArgentina() ? "ARS" : "USD";
     const d = modal(`<h2>${esc(motivo || "Planes")}</h2>
       <div class="pl-opts"><div class="seg" role="group" aria-label="Período"><button type="button" data-per="mensual">Mensual</button><button type="button" data-per="anual">Anual · 2 meses gratis</button></div>
         <div class="seg" role="group" aria-label="Moneda"><button type="button" data-mon="ARS">Pesos</button><button type="button" data-mon="USD">Dólares</button></div></div>
-      <div class="planes">${Object.entries(PLANES).map(([k, p]) => `<div class="plan${k == "pro" ? " rec" : ""}"><h3>${p.nombre}</h3><div class="pr" data-pr="${k}"></div>
+      <div class="planes">${Object.entries(PLANES).map(([k, p]) => `<div class="plan${k == "pro" ? " rec" : ""}"><h3>${p.nombre}</h3><div class="lema">${esc(p.lema)}</div><div class="pr" data-pr="${k}"></div>
         <ul>${all.map(f => `<li class="${p.funciones.includes(f) ? "" : "no"}">${p.funciones.includes(f) ? "✓" : "–"} ${fl(f)}</li>`).join("")}</ul>
         <button class="btn${k == "pro" ? " primary" : ""}" data-plan="${k}">Suscribirme</button></div>`).join("")}</div>
       <p class="small ink2" id="pl-nota"></p>

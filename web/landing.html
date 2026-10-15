@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Análisis Karting · Telemetría de karting, curva por curva</title>
-<meta name="description" content="Analizá tus tandas de AiM MyChron curva por curva: dónde perdés tiempo, si es manejo o agarre, motor y carburación. Programa para Windows y versión web. 7 días gratis.">
-<meta property="og:title" content="Análisis Karting · Telemetría de karting, curva por curva">
-<meta property="og:description" content="Dónde perdés tiempo, si es manejo o agarre, motor y carburación. 7 días gratis.">
+<title>Análisis Karting · Tu ingeniero de pista, solo para vos</title>
+<meta name="description" content="Para cualquiera que se suba a un kart: abrís tus tandas de la MyChron y te dice en qué curva perdés tiempo, si fuiste vos o fue el kart, y cómo andan el motor y la carburación. 7 días gratis.">
+<meta property="og:title" content="Análisis Karting · Tu ingeniero de pista, solo para vos">
+<meta property="og:description" content="En qué curva perdés, si fuiste vos o fue el kart, motor y carburación. Para cualquiera que se suba a un kart. 7 días gratis.">
 <meta property="og:image" content="img/simple.webp">
 <link rel="stylesheet" href="styles.css">
 <style>
@@ -40,6 +40,15 @@
   .feat h3{font-size:17px;margin-bottom:6px}
   .feat p{color:var(--ink2);font-size:14px;line-height:1.55}
   .feat .k{font:700 12px var(--display);letter-spacing:.1em;color:var(--s2);margin-bottom:8px;display:block}
+  .who{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+  .who div{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px}
+  .who h3{font-size:19px;margin-bottom:8px}
+  .who p{color:var(--ink2);font-size:15px;line-height:1.55}
+  .who .tag{display:inline-block;font:700 11px var(--display);letter-spacing:.1em;color:var(--s2);margin-bottom:10px}
+  .trial{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--ink2);border-radius:12px;padding:22px 26px}
+  .trial b{font:700 24px var(--display)}
+  .trial p{color:var(--ink2)}
+  .price .lema{font:600 13px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--s2)}
   .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:36px;align-items:center}
   .split ul{margin:12px 0 0;padding-left:18px;color:var(--ink2);display:grid;gap:8px;font-size:15px}
   .phone{max-width:300px;margin:0 auto;border-radius:22px;border:6px solid #222a35}
@@ -69,7 +78,7 @@
   .arrep{display:inline-block;padding:6px 12px;border:1px solid var(--ink2);border-radius:5px;color:var(--ink);text-decoration:none;font-weight:600}
   .cta{white-space:nowrap}
   @media (max-width:520px){.logo{font-size:14px;letter-spacing:.04em}header.top .cta.sm{padding:6px 10px;font-size:11px}}
-  @media (max-width:900px){.lhero,.split{grid-template-columns:1fr}.feats,.prices{grid-template-columns:1fr}nav.links a.hide-m{display:none}.lhero{padding-top:40px}}
+  @media (max-width:900px){.lhero,.split{grid-template-columns:1fr}.feats,.prices,.who{grid-template-columns:1fr}nav.links a.hide-m{display:none}.lhero{padding-top:40px}}
 </style>
 </head>
 <body>
@@ -82,23 +91,42 @@
 <main>
 <div class="wrap lhero">
   <div>
-    <div class="eyebrow">Telemetría de karting · AiM MyChron</div>
-    <h1>Sabé en qué curva <em>perdés tiempo</em> y por qué.</h1>
-    <p class="lead">Cargá tus tandas y en segundos te dice cuánto perdés, en qué curva, si es manejo o agarre, y cómo anduvo el motor. Sin planillas, en castellano y pensado para pilotos y mecánicos.</p>
+    <div class="eyebrow">Telemetría de karting para todos</div>
+    <h1>Tu ingeniero de pista, <em>solo para vos</em>.</h1>
+    <p class="lead">Abrís tus tandas de la MyChron y te dice, en palabras simples, en qué curva perdés tiempo, si fuiste vos o fue el kart, y qué probar para ir más rápido. Para cualquiera que se suba a un kart: el que recién empieza, el que entrena y el que pelea el campeonato.</p>
     <div class="ctas"><a class="cta pri" href="app.html">Probá 7 días gratis</a><a class="cta" href="https://github.com/francomica22-lab/kart-telemetria/releases/latest/download/AnalisisKarting-windows.zip">Descargar para Windows</a></div>
-    <p class="fine">Sin tarjeta para la prueba. Tus archivos no salen de tu computadora.</p>
+    <p class="fine"><b>7 días gratis con todo</b>, sin tarjeta. Tus archivos no salen de tu computadora.</p>
   </div>
   <div class="shot"><img src="img/simple.webp" alt="Análisis simple: +0,21 s por vuelta, se perdió por manejo, mapa del circuito con las curvas donde se pierde y qué hacer" width="1197" height="1004"></div>
 </div>
+
+<section id="para-quien"><div class="wrap">
+  <h2>Para cualquiera que se suba a un kart</h2>
+  <p class="sub">No hace falta ser piloto profesional ni entender de datos. Si tenés una MyChron, ya podés mejorar.</p>
+  <div class="who">
+    <div><span class="tag">RECIÉN EMPEZÁS</span><h3>Te explica todo fácil</h3><p>Sin gráficos complicados: te dice qué hiciste bien, en qué curva perdés y qué probar en la próxima tanda. En castellano, como te lo diría alguien al lado del kart.</p></div>
+    <div><span class="tag">ENTRENÁS</span><h3>Mejorás tanda a tanda</h3><p>Compará tus vueltas dentro de una tanda, o la primera del día con la última. Ves en qué lugares fuiste mejor y qué cambio te hizo andar más rápido.</p></div>
+    <div><span class="tag">COMPETÍS</span><h3>El detalle de un profesional</h3><p>Curva por curva, sectores, G, motor, carburación y transmisión. Para vos, tu mecánico y tu equipo, aunque no estén en la pista.</p></div>
+  </div>
+</div></section>
+
+<section><div class="wrap split">
+  <div><h2>Con una tanda o con todas</h2>
+    <p class="ink2">Con <b>una sola tanda</b> ya ves tu vuelta óptima: junta tus mejores curvas y te dice qué hiciste distinto para que lo repitas.</p>
+    <ul><li><b>Varias tandas:</b> encontrás dónde fuiste mejor y qué te sirvió: gomas, presiones, relación o setup.</li>
+      <li><b>¿Fuiste vos o fue el kart?</b> Te dice si la curva la perdiste por manejo o porque el kart no agarró: gomas nuevas o gastadas, pista distinta, otro setup.</li>
+      <li><b>¿Probaste otro motor, carburador o escape?</b> Te dice si rindió más, con margen de error, y si hubo fallas.</li></ul></div>
+  <div class="shot"><img src="img/una-tanda.webp" alt="Análisis de una sola tanda: mejor vuelta, vuelta posible juntando las mejores curvas y qué repetir" width="1197" height="1004" loading="lazy"></div>
+</div></section>
 
 <section id="funciones"><div class="wrap">
   <h2>Todo lo que te dice una tanda</h2>
   <p class="sub">Elegí una tanda para ver tu vuelta óptima, o varias para compararlas.</p>
   <div class="feats">
     <div class="feat"><span class="k">01 · CURVAS</span><h3>Dónde perdés</h3><p>Curva por curva y por sectores: tiempo, velocidad en el vértice, frenada, aceleración y línea. Te marca las 3 curvas que más te cuestan.</p></div>
-    <div class="feat"><span class="k">02 · DIAGNÓSTICO</span><h3>¿Manejo o agarre?</h3><p>Compara la G lateral que usaste contra la que el kart te dio en la tanda: si fue el piloto, las gomas o el setup.</p></div>
+    <div class="feat"><span class="k">02 · DIAGNÓSTICO</span><h3>¿Fuiste vos o fue el kart?</h3><p>Compara el agarre que usaste contra el que el kart te dio: si la curva se perdió por manejo, por las gomas, por la pista o por el setup.</p></div>
     <div class="feat"><span class="k">03 · VUELTA ÓPTIMA</span><h3>Lo que ya hiciste bien</h3><p>Junta tus mejores curvas y te dice qué hiciste distinto en cada una para que lo repitas.</p></div>
-    <div class="feat"><span class="k">04 · MOTOR</span><h3>Potencia y fallas</h3><p>Curva de potencia en HP, comparación entre tandas con margen de error y detección de cortes de encendido por curva.</p></div>
+    <div class="feat"><span class="k">04 · MOTOR</span><h3>¿Rindió más?</h3><p>Potencia en HP y comparación entre tandas: sabés si un motor, carburador o escape nuevo te dio algo. Además detecta cortes de encendido por curva.</p></div>
     <div class="feat"><span class="k">05 · CARBURACIÓN</span><h3>Gordo, fino o en punto</h3><p>Tres indicios sin sensor de escape, cruzados con lo que sentiste. Te sugiere el chicler según el clima del día.</p></div>
     <div class="feat"><span class="k">06 · COMPARTIR</span><h3>Link, QR y PDF</h3><p>Mostrale el análisis a tu mecánico o a tu equipo en el celular, aunque no estén en la pista.</p></div>
   </div>
@@ -127,19 +155,22 @@
 
 <section id="precios"><div class="wrap">
   <h2>Precios</h2>
-  <p class="sub">7 días gratis con todo. Después elegís el plan. Cancelás cuando quieras desde la app.</p>
+  <div class="trial" style="margin-bottom:22px"><div><b>7 días gratis con todo</b><p>Sin tarjeta. Probalo en tus próximas tandas y después elegís.</p></div><a class="cta pri" href="app.html">Empezar gratis</a></div>
+  <p class="sub">Los dos planes son tu ingeniero de pista. La diferencia es cómo te habla: <b>Simple</b> te lo explica fácil, <b>Pro</b> te habla como un ingeniero profesional. Cancelás cuando quieras desde la app.</p>
   <div class="pt"><div class="seg" role="group" aria-label="Período"><button data-per="mensual">Mensual</button><button data-per="anual">Anual · 2 meses gratis</button></div>
     <div class="seg" role="group" aria-label="Moneda"><button data-mon="ARS">Pesos</button><button data-mon="USD">Dólares</button></div></div>
   <div class="prices">
-    <div class="price"><h3>Prueba</h3><div class="amt">Gratis <small>7 días</small></div><ul><li>Todo lo del plan Pro</li><li>Sin tarjeta</li><li>No se renueva sola</li></ul><a class="cta" href="app.html">Empezar</a></div>
-    <div class="price"><h3>Simple</h3><div class="amt" data-pr="simple"></div><ul><li>Analizar y comparar tandas</li><li>Análisis simple: dónde perdés y qué hacer</li><li>Vuelta óptima y circuito</li><li>Exportar a PDF</li><li class="no">Análisis detallado</li><li class="no">Motor, carburación y setup</li><li class="no">Compartir por link y QR</li></ul><a class="cta" href="app.html">Elegir Simple</a></div>
-    <div class="price rec"><h3>Pro</h3><div class="amt" data-pr="pro"></div><ul><li>Todo lo del plan Simple</li><li>Análisis detallado: curvas, sectores, G</li><li>Motor, carburación y transmisión</li><li>Setup por tanda y video sincronizado</li><li>Compartir por link y QR</li></ul><a class="cta pri" href="app.html">Elegir Pro</a></div>
+    <div class="price"><h3>Prueba</h3><div class="lema">Todo, para probar</div><div class="amt">Gratis <small>7 días</small></div><ul><li>Todo lo del plan Pro</li><li>Sin tarjeta</li><li>No se renueva sola</li></ul><a class="cta" href="app.html">Empezar</a></div>
+    <div class="price"><h3>Simple</h3><div class="lema">Te habla fácil</div><div class="amt" data-pr="simple"></div><ul><li>Analizar y comparar tandas</li><li>En qué curva perdés y qué probar, en palabras simples</li><li>Si fuiste vos o fue el kart</li><li>Vuelta óptima y circuito</li><li>Exportar a PDF</li><li class="no">Análisis detallado</li><li class="no">Motor, carburación y setup</li><li class="no">Compartir por link y QR</li></ul><a class="cta" href="app.html">Elegir Simple</a></div>
+    <div class="price rec"><h3>Pro</h3><div class="lema">Te habla como un ingeniero</div><div class="amt" data-pr="pro"></div><ul><li>Todo lo del plan Simple</li><li>Análisis detallado: curvas, sectores, G</li><li>Motor, carburación y transmisión</li><li>Setup por tanda y video sincronizado</li><li>Compartir por link y QR</li></ul><a class="cta pri" href="app.html">Elegir Pro</a></div>
   </div>
   <p class="small muted" style="margin-top:14px" id="pnota"></p>
 </div></section>
 
 <section id="preguntas" class="faq"><div class="wrap">
   <h2>Preguntas</h2>
+  <details><summary>¿Tengo que saber de datos o de telemetría?</summary><p>No. Está pensada para cualquiera: el plan Simple te explica todo en palabras simples (en qué curva perdés, si fuiste vos o fue el kart, qué probar). Si querés ir a fondo, el plan Pro te muestra el detalle como lo vería un ingeniero.</p></details>
+  <details><summary>¿Sirve con una sola tanda?</summary><p>Sí. Con una tanda ves tu vuelta óptima (tus mejores curvas juntas) y qué hiciste distinto en cada una. Con varias, comparás y ves qué te hizo andar mejor.</p></details>
   <details><summary>¿Mis archivos se suben a algún lado?</summary><p>No. El análisis se hace en tu computadora o en tu navegador. Solo viaja un resumen anónimo de cada tanda (circuito, kart, mejor tiempo) que podés desactivar, y la copia del reporte si vos elegís compartirlo por link.</p></details>
   <details><summary>¿Necesito internet en la pista?</summary><p>El programa de Windows funciona sin internet. Solo necesita conectarse una vez cada 7 días para confirmar tu suscripción.</p></details>
   <details><summary>¿Qué cronómetros funcionan?</summary><p>Hoy, los archivos .xrk de AiM MyChron (los que descarga Race Studio 3). Estamos sumando Unipro y Alfano.</p></details>
