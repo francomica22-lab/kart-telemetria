@@ -1,8 +1,8 @@
 # Análisis Karting
 
-Compará tandas de la **AiM MyChron** (archivos `.xrk`) curva por curva: cuánto se pierde, dónde, si es manejo o agarre, y cómo rindió el motor.
+Compará tandas de la **AiM MyChron** (archivos `.xrk` y `.xrz`) curva por curva: cuánto se pierde, dónde, si es manejo o agarre, y cómo rindió el motor.
 
-- **Web:** https://francomica22-lab.github.io/kart-telemetria/ — el análisis corre en el navegador (Pyodide); los archivos no se suben.
+- **Web:** https://francomica22-lab.github.io/kart-telemetria/ (portada) · la app web está en `app.html` — el análisis corre en el navegador (Pyodide); los archivos no se suben.
 - **Windows:** [descargar](https://github.com/francomica22-lab/kart-telemetria/releases/latest/download/AnalisisKarting-windows.zip). Funciona sin internet. Al abrirlo por primera vez se instala solo y crea el acceso directo. Cuando hay una versión nueva aparece un aviso **!** arriba a la derecha.
 
 > Windows puede mostrar "Windows protegió su PC" porque el programa no está firmado: tocá *Más información → Ejecutar de todas formas*.
@@ -23,6 +23,15 @@ Compará tandas de la **AiM MyChron** (archivos `.xrk`) curva por curva: cuánto
 - **Reportar un problema** desde la app.
 - **Catálogo de karts**: categoría, chasis y motor de cada kart (se confirma una vez por kart).
 
+## Cuentas y planes
+
+Desde la 2.0 hace falta una cuenta (mail y contraseña). Al crearla hay **7 días de prueba** con todo; después, plan **Simple** o **Pro**, mensual o anual.
+- Cobro: **Mercado Pago** (Argentina, pesos) y **Lemon Squeezy** (exterior, dólares).
+- Las suscripciones viven en Supabase (`suscripciones`); las cambian solo las funciones del servidor (`supabase/functions/`), que leen el estado real del medio de pago.
+- Botón de baja y de arrepentimiento en la app y en `arrepentimiento.html` (Ley 24.240).
+- Panel de administración en `admin.html` (solo cuentas de la tabla `admins` con mail confirmado).
+- Pasos para lanzar: [`docs/LANZAMIENTO.md`](docs/LANZAMIENTO.md).
+
 ## Datos anónimos
 
 La app comparte un resumen anónimo de cada tanda analizada (activado por defecto, se desactiva en *Ajustes del análisis*):
@@ -35,6 +44,9 @@ circuito (ubicación aproximada, largo, curvas), kart (categoría, chasis, motor
 |---|---|
 | `app/` | Análisis en Python (`kartlib`, `tandas`, `motor`, `sesiones`, `setup_kart`), programa de escritorio (`desktop.py`) y actualizador (`updater.py`) |
 | `web/` | Interfaz (la misma para escritorio y web). `web-backend.js` + `py-worker.js` solo se usan en la web |
+| `web/landing.html` | Portada (en el sitio queda como `index.html`; la app web pasa a `app.html`) |
+| `supabase/` | SQL de las tablas y funciones (`*.sql`) y funciones del servidor (`functions/`: suscribir, mp-webhook, ls-webhook, cancelar) |
+| `docs/` | Lanzamiento, nombres posibles, formatos de otros cronómetros |
 | `tools/build_site.py` | Arma la carpeta `site/` para GitHub Pages |
 | `tools/qa_all.py` | Prueba el análisis con todas las tandas de una carpeta (solas y de a pares) |
 | `.github/workflows/` | `pages.yml` publica la web en cada push a `main`; `release.yml` arma el `.exe` en cada tag `vX.Y.Z` |

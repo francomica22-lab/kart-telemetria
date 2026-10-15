@@ -21,6 +21,7 @@
   const box = document.getElementById("box");
   const q = new URLSearchParams(location.hash.slice(1) || location.search.slice(1));
   const done = (t, p) => box.innerHTML = `<div class="eyebrow">Análisis Karting</div><h1>${t}</h1><p class="ink2">${p}</p>`;
+  if (new URLSearchParams(location.search).get("pago") == "ok") return done("¡Gracias por suscribirte!", "Volvé al programa (o a la versión web): tu plan se activa solo en un minuto. Si no aparece, tocá tu cuenta → Actualizar.");
   if (q.get("error")) return done("El link no funcionó", (q.get("error_description") || "El link venció o ya se usó.").replace(/\+/g, " ") + " Pedí uno nuevo desde el programa.");
   const at = q.get("access_token"), type = q.get("type");
   if (!at) return done("Tu cuenta", "Abrí este link desde el mail que te mandamos.");
