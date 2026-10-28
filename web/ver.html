@@ -30,7 +30,7 @@
     const D = await KTR.ver(id);
     if (!D || !D.sessions) return fail("El reporte venció (duran 30 días) o el link no es correcto.");
     renderReport(D, app, {});
-    document.title = `${D.sessions.map(s => s.top[0].toFixed(3)).join(" vs ")} · Análisis Karting`;
+    document.title = `${D.sessions.map(s => tVuelta(s.top[0])).join(" vs ")} · Análisis Karting`;
     const b = document.getElementById("v-pdf"); b.hidden = false; b.addEventListener("click", () => KTR.printNow(app));
   } catch (e) { fail("No se pudo cargar. Revisá la conexión e intentá de nuevo."); }
 })();

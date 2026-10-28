@@ -51,7 +51,7 @@
     const item = (k, rs, label) => {
       const best = rs.filter(r => r.mejor_n).map(r => r.mejor_n), nsel = rs.filter(r => sel.includes(r.path)).length;
       return `<button class="circ-row${circ == k ? " on" : ""}" data-c="${esc(k)}"><span class="cn">${esc(label || k)}</span>${nsel ? `<span class="cs">${nsel}</span>` : ""}
-        <span class="cm">${esc(rango(rs))} · ${rs.length} tanda${rs.length > 1 ? "s" : ""}${best.length ? ` · mejor ${Math.min(...best).toFixed(3)}` : ""}</span></button>`;
+        <span class="cm">${esc(rango(rs))} · ${rs.length} tanda${rs.length > 1 ? "s" : ""}${best.length ? ` · mejor ${tVuelta(Math.min(...best))}` : ""}</span></button>`;
     };
     $("list").innerHTML = `<div class="eyebrow pad-x">Circuitos</div>` + keys.map(k => item(k, groups[k])).join("") + (keys.length > 1 ? item("*", vis, "Todos los circuitos") : "");
     renderHome();
@@ -72,12 +72,12 @@
       const rs = days[d].sort((a, b) => (a.orden < b.orden ? 1 : -1)), best = rs.filter(r => r.mejor_n).map(r => r.mejor_n);
       const allSel = rs.every(r => sel.includes(r.path));
       return `<tbody><tr class="dayrow"><td><button class="chk${allSel ? " on" : ""}" data-day="${esc(d)}" title="${allSel ? "Quitar" : "Elegir"} todas las tandas del día" aria-pressed="${allSel}"></button></td>
-        <td colspan="9"><b>${esc(d)}</b> <span class="muted">· ${rs.length} tanda${rs.length > 1 ? "s" : ""}${best.length ? ` · mejor <b class="num">${Math.min(...best).toFixed(3)}</b>` : ""}${circ == "*" ? " · " + esc([...new Set(rs.map(pistaDe))].join(", ")) : ""}</span></td></tr>` +
+        <td colspan="9"><b>${esc(d)}</b> <span class="muted">· ${rs.length} tanda${rs.length > 1 ? "s" : ""}${best.length ? ` · mejor <b class="num">${tVuelta(Math.min(...best))}</b>` : ""}${circ == "*" ? " · " + esc([...new Set(rs.map(pistaDe))].join(", ")) : ""}</span></td></tr>` +
         rs.map(r => {
           const c = colorOf(r.path), se = sesionDe(r), isBest = r.mejor_n && r.mejor_n == Math.min(...best);
           return `<tr class="srow${c ? " sel" : ""}${r.vueltas ? "" : " nolap"}" data-p="${esc(r.path)}" style="--c:${c || "transparent"}" tabindex="0" aria-selected="${!!c}" title="${esc(tip(r))}">
             <td><span class="chk${c ? " on" : ""}"></span></td><td class="num">${esc(r.hora)}</td><td class="num">${r.vueltas || "–"}</td>
-            <td class="num best${isBest ? " top" : ""}">${r.mejor_n ? r.mejor_n.toFixed(3) : "–"}</td>
+            <td class="num best${isBest ? " top" : ""}">${r.mejor_n ? tVuelta(r.mejor_n) : "–"}</td>
             <td class="ses">${esc(se.s || r.tipo || "")}</td><td class="c-pil${hid.pil ? " hide" : ""}">${esc(r.piloto)}</td><td class="c-veh${hid.veh ? " hide" : ""}">${esc(r.kart)}</td><td class="c-camp${hid.camp ? " hide" : ""}">${esc(r.campeonato)}</td>
             <td class="c-com muted${hid.com ? " hide" : ""}">${esc(se.resto)}</td><td class="c-id num muted">#${esc(r.id)}</td></tr>`;
         }).join("") + `</tbody>`;

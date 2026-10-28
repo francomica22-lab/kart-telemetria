@@ -1,3 +1,11 @@
+/* Tiempo de vuelta: segundos hasta 59.999, después m:ss.mmm (1:02.345). */
+function tVuelta(t) {
+  if (t == null || !isFinite(t)) return "–";
+  const ms = Math.round(t * 1000);
+  if (ms < 60000) return (ms / 1000).toFixed(3);
+  return `${Math.floor(ms / 60000)}:${((ms % 60000) / 1000).toFixed(3).padStart(6, "0")}`;
+}
+
 /* Secciones del reporte: vuelta optima, potencia, transmision, sensores, video y setup.
    Las usa report.js (window.KTX). Todo es local: no necesita internet salvo el clima (lo trae app.js). */
 (function () {
@@ -36,7 +44,7 @@
   function setupModal(D, s, onSave) {
     const V = Object.assign({}, (s.setup || {}).valores || {}), auto = (s.setup || {}).auto || {}, F = (D.setup_fields || []).filter(f => !CARB_KEYS.includes(f[0]));
     const d = document.createElement("div"); d.className = "modal";
-    d.innerHTML = `<form class="mbox wide" role="dialog" aria-modal="true" aria-labelledby="st"><h2 id="st">Setup · ${esc(s.top[0].toFixed(3))} · ${esc(s.hour)}</h2>
+    d.innerHTML = `<form class="mbox wide" role="dialog" aria-modal="true" aria-labelledby="st"><h2 id="st">Setup · ${esc(tVuelta(s.top[0]))} · ${esc(s.hour)}</h2>
       <p class="ink2 small">Lo que viene del comentario de la MyChron ya está completo. Lo que cargues acá se guarda junto al archivo de la tanda.</p>
       <div class="sgrid">${F.map(f => `<label class="${f[0] == "notas" ? "full" : ""}"><span>${esc(f[1])}${f[2] ? ` <span class="muted">(${esc(f[2])})</span>` : ""}${auto[f[0]] != null ? ` <span class="muted">· del comentario</span>` : ""}</span>
         ${f[0] == "notas" ? `<textarea id="sf-${f[0]}" rows="2">${esc(V[f[0]] ?? "")}</textarea>` : `<input id="sf-${f[0]}" value="${esc(V[f[0]] ?? "")}" autocomplete="off">`}</label>`).join("")}</div>
@@ -88,9 +96,9 @@
       const lost = op.mejor - op.optima, toAvg = op.promedio - op.optima;
       h += `<div class="panel"><div class="eyebrow" style="color:${COL[id]};margin-bottom:6px">${NAME(id)} · ${op.vueltas} vueltas analizadas</div>
         <div class="optrow">
-          <div><div class="eyebrow">Vuelta óptima</div><div class="big">${op.optima.toFixed(3)}</div><div class="muted small">tus mejores curvas juntas</div></div>
-          <div><div class="eyebrow">Mejor vuelta</div><div class="big">${op.mejor.toFixed(3)}</div><div class="muted small">vuelta ${op.mejor_vuelta} · ${sgn(lost, 3)} s</div></div>
-          <div><div class="eyebrow">Promedio</div><div class="big">${op.promedio.toFixed(3)}</div><div class="muted small" title="Desvío entre vueltas: ±${op.desvio.toFixed(2)} s">${sgn(toAvg, 3)} s · ±${op.desvio.toFixed(2)} s</div></div>
+          <div><div class="eyebrow">Vuelta óptima</div><div class="big">${tVuelta(op.optima)}</div><div class="muted small">tus mejores curvas juntas</div></div>
+          <div><div class="eyebrow">Mejor vuelta</div><div class="big">${tVuelta(op.mejor)}</div><div class="muted small">vuelta ${op.mejor_vuelta} · ${sgn(lost, 3)} s</div></div>
+          <div><div class="eyebrow">Promedio</div><div class="big">${tVuelta(op.promedio)}</div><div class="muted small" title="Desvío entre vueltas: ±${op.desvio.toFixed(2)} s">${sgn(toAvg, 3)} s · ±${op.desvio.toFixed(2)} s</div></div>
         </div>
         ${tips.length ? `<div class="todo" style="margin-top:12px"><div class="eyebrow">Repetí lo que ya hiciste bien</div><ul class="why compact">${tips.map(t => `<li>${t.why.length ? `<details class="fold"><summary><b>Curva ${t.n}</b> · vuelta ${t.lap} · <span class="g num">−${t.gain.toFixed(2)} s</span> vs tu promedio</summary><div class="fold-body">${t.why.join(", ")}.</div></details>` : `<b>Curva ${t.n}</b> · vuelta ${t.lap} · <span class="g num">−${t.gain.toFixed(2)} s</span> vs tu promedio`}</li>`).join("")}</ul></div>` : ""}
         <details class="fold subtle" style="margin-top:10px"><summary class="small">Regularidad y ritmo</summary><div class="fold-body"><ul class="why">
@@ -99,7 +107,7 @@
         </ul></div></details>
         <details class="fold subtle"><summary class="small">Tabla curva por curva</summary><div class="fold-body tw"><table><thead><tr><th>Curva</th><th>Óptima</th><th>Vuelta</th><th>En tu mejor vuelta</th><th>Promedio</th><th>Desvío</th><th>Vértice ±m</th></tr></thead><tbody>
           ${op.curvas.map(c => `<tr><td>Curva ${c.n}</td><td class="g">${c.mejor.toFixed(3)}</td><td>V${c.mejor_lap}</td><td>${c.en_mejor_vuelta != null ? c.en_mejor_vuelta.toFixed(3) + ` <span class="muted">${sgn(c.en_mejor_vuelta - c.mejor)}</span>` : "–"}</td><td>${c.promedio.toFixed(3)} <span class="muted">${sgn(c.promedio - c.mejor)}</span></td><td>±${c.desvio.toFixed(3)}</td><td>±${c.desvio_vertice.toFixed(1)}</td></tr>`).join("")}
-          <tr class="first"><td><b>Vuelta</b></td><td class="g"><b>${op.optima.toFixed(3)}</b></td><td></td><td>${op.mejor.toFixed(3)}</td><td>${op.promedio.toFixed(3)}</td><td>±${op.desvio.toFixed(3)}</td><td></td></tr>
+          <tr class="first"><td><b>Vuelta</b></td><td class="g"><b>${tVuelta(op.optima)}</b></td><td></td><td>${tVuelta(op.mejor)}</td><td>${tVuelta(op.promedio)}</td><td>±${op.desvio.toFixed(3)}</td><td></td></tr>
         </tbody></table></div></details></div>`;
     }
     return h;
@@ -108,7 +116,7 @@
     const { D } = ctx, op = D.optimo[id]; if (!op) return "";
     const tips = optimoTips(op).slice(0, 2);
     return `<div class="panel"><div class="eyebrow" style="margin-bottom:6px">Tu vuelta óptima</div>
-      <p>Juntando tus mejores curvas de la tanda, la vuelta sería <b>${op.optima.toFixed(3)}</b>, <b>${(op.mejor - op.optima).toFixed(2)} s</b> mejor que tu mejor vuelta.</p>
+      <p>Juntando tus mejores curvas de la tanda, la vuelta sería <b>${tVuelta(op.optima)}</b>, <b>${(op.mejor - op.optima).toFixed(2)} s</b> mejor que tu mejor vuelta.</p>
       ${tips.length ? `<ul class="why" style="margin-top:8px">${tips.map(t => `<li>En la <b>curva ${t.n}</b>, en la vuelta ${t.lap}, lo hiciste ${t.gain.toFixed(2)} s mejor que tu promedio${t.why.length ? ": " + t.why.slice(0, 2).join(" y ") : ""}. ¡Repetilo!</li>`).join("")}</ul>` : ""}</div>`;
   }
 
@@ -198,7 +206,7 @@
             <p class="small ink2">${zoom > 1 ? "Las diferencias de línea están ampliadas 4 veces para que se vean." : "Línea según el GPS (precisión de 1 a 2 m). La franja gris es la pista aproximada."}</p></div>
         </div>
         <div class="cvt-chhead"><span class="eyebrow">Velocidad en la curva</span>
-          ${laps.length > 1 ? `<label class="cvt-sel">Comparar con <select data-cv="cmp">${laps.filter(l => l.lap != bl.lap).map(l => `<option value="${l.lap}" ${l.lap == cmp ? "selected" : ""}>vuelta ${l.lap} · ${l.t.toFixed(3)} s${l.lap == tip.lap ? " (típica)" : ""}</option>`).join("")}</select></label>` : ""}</div>
+          ${laps.length > 1 ? `<label class="cvt-sel">Comparar con <select data-cv="cmp">${laps.filter(l => l.lap != bl.lap).map(l => `<option value="${l.lap}" ${l.lap == cmp ? "selected" : ""}>vuelta ${l.lap} · ${tVuelta(l.t)}${l.lap == tip.lap ? " (típica)" : ""}</option>`).join("")}</select></label>` : ""}</div>
         <svg class="cvt-chart"></svg>
         <p class="small ink2">F: empieza a frenar · V: vértice · A: vuelve a acelerar. Abajo, la línea azul es el tiempo que la vuelta ${cmp} pierde (sube) o gana (baja) contra tu mejor pasada, metro a metro. Pasá el mouse para ver los valores.</p>`;
       const sel = root.querySelector('[data-cv="cmp"]'); if (sel) sel.addEventListener("change", () => { cmp = +sel.value; render(); });
@@ -884,8 +892,8 @@
       const st = state[id] = { offset: null, fine: 0, key: null };
       const sel = box.querySelector(".vpoint");
       const laps = serie.laps.filter(l => l.num > 0);
-      box.querySelector(".vlap").insertAdjacentHTML("beforeend", laps.map(l => `<option value="${l.num}">Vuelta ${l.num} · ${l.time.toFixed(3)}</option>`).join(""));
-      sel.innerHTML = laps.map(l => `<option value="line:${l.num}">Línea de la MyChron · inicio vuelta ${l.num} (${l.time.toFixed(3)})</option>`).join("") +
+      box.querySelector(".vlap").insertAdjacentHTML("beforeend", laps.map(l => `<option value="${l.num}">Vuelta ${l.num} · ${tVuelta(l.time)}</option>`).join(""));
+      sel.innerHTML = laps.map(l => `<option value="line:${l.num}">Línea de la MyChron · inicio vuelta ${l.num} (${tVuelta(l.time)})</option>`).join("") +
         laps.flatMap(l => D.corners.map(c => `<option value="apex:${l.num}:${c.n}">Vértice curva ${c.n} · vuelta ${l.num}</option>`)).join("");
       const setOffset = (o, why) => {
         st.offset = o; store.set(st.key, { offset: o, fine: st.fine });

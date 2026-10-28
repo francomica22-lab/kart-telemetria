@@ -17,7 +17,7 @@
     const C = D.corners, others = IDS.filter(i => i != REF);
     const NOM_TXT = `<div class="panel"><h2>Sin datos de motor</h2><p class="ink2">${(D.sin_rpm || []).length ? `${D.sin_rpm.length == IDS.length ? "Estas tandas no tienen" : "La tanda " + D.sin_rpm.map(x => S[x] ? BT(x) : x).join(", ") + " no tiene"} RPM registradas (la MyChron necesita el cable de RPM conectado a la bobina o al cable de bujía). Sin RPM no se puede analizar motor, carburación ni transmisión; el resto del análisis funciona igual.` : "No se pudo analizar el motor de estas tandas. El resto del análisis funciona igual."}</p></div>`;
     const COL = Object.fromEntries(IDS.map((id, i) => [id, (opts.colors && opts.colors[id]) || PAL[i % 5]]));
-    const BT = id => S[id].top[0].toFixed(3);   // identidad de la tanda: su mejor tiempo
+    const BT = id => tVuelta(S[id].top[0]);   // identidad de la tanda: su mejor tiempo
     const multiDriver = new Set(D.sessions.map(s => (s.driver || "").trim().toUpperCase())).size > 1;
     const NAME = id => `${BT(id)} · ${multiDriver ? (S[id].driver || "?") + " · " : ""}${S[id].hour}`;
     const TAG = id => `<b style="color:${COL[id]}">${BT(id)}</b> <span class="muted">(${multiDriver ? esc(S[id].driver || "?") + ", " : ""}${S[id].hour})</span>`;
@@ -40,8 +40,8 @@
       <div class="cards-ses">${IDS.map(id => {
         const s = S[id], w = s.laps.filter(l => s.top.includes(l.t) && l.agua != null).map(l => l.agua);
         return `<div class="sc" style="--c:${COL[id]}"><div class="eyebrow">${s.hour} · ${esc(s.kart)} · <span style="opacity:.7">tanda ${id}</span></div>
-          <div class="t">${s.top[0].toFixed(3)}</div>
-          <div class="l" title="Mejores ${s.top.length}: ${s.top.map(x => x.toFixed(3)).join(" · ")} · ideal (mejores curvas juntas) ${s.ideal.toFixed(3)}">prom ${avg(s.top).toFixed(3)} · ideal ${s.ideal.toFixed(3)}</div>
+          <div class="t">${tVuelta(s.top[0])}</div>
+          <div class="l" title="Mejores ${s.top.length}: ${s.top.map(tVuelta).join(" · ")} · ideal (mejores curvas juntas) ${tVuelta(s.ideal)}">prom ${tVuelta(avg(s.top))} · ideal ${tVuelta(s.ideal)}</div>
           <div class="l stats" title="${(D.clima || {})[id] ? esc(KTX.climaTxt(D.clima[id])) + " · " : ""}punta ${s.vmax} km/h">${(D.clima || {})[id] ? `${D.clima[id].T.toFixed(0)} °C · ` : ""}${s.vmax} km/h${w.length ? ` · agua ${Math.min(...w).toFixed(0)}–${Math.max(...w).toFixed(0)} °C` : ""}</div>
           ${s.comment ? `<div class="cm" title="${esc(s.comment)}">“${esc(s.comment.replace(/\n/g, ", "))}”</div>` : ""}
           ${window.KTK ? `<button class="kartbtn" data-k="${esc(s.kart || "")}" title="Categoría, chasis y motor de este kart">${esc(KTK.label(s.kart))}${KTK.get(s.kart).confirmado ? "" : " <span class=\"muted\">· confirmar</span>"}</button>` : ""}
@@ -354,7 +354,7 @@
       const optTile = id => {
         const op = D.optimo[id]; if (!op) return "";
         const t = KTX.optimoTips(op)[0];
-        return tile("Vuelta posible", op.optima.toFixed(3), `${(op.mejor - op.optima).toFixed(2)} s menos${t ? ` · repetí la curva ${t.n} de la vuelta ${t.lap}` : ""}`);
+        return tile("Vuelta posible", tVuelta(op.optima), `${(op.mejor - op.optima).toFixed(2)} s menos${t ? ` · repetí la curva ${t.n} de la vuelta ${t.lap}` : ""}`);
       };
       const shortTip = p => {
         if (p.k == "agarre") return "Le faltó agarre: gomas o setup";
@@ -379,9 +379,9 @@
         for (const id of IDS) {
           const L = S[id].laps, b = Math.min(...L.map(l => l.t)), pts = L.map((l, i) => `${X(i).toFixed(1)},${Y(l.t).toFixed(1)}`);
           g += `<polyline points="${pts.join(" ")}" fill="none" stroke="${COL[id]}" stroke-width="2.5" stroke-linejoin="round" opacity=".85"/>`;
-          L.forEach((l, i) => { g += `<circle cx="${X(i).toFixed(1)}" cy="${Y(l.t).toFixed(1)}" r="${l.t == b ? 5 : 2.5}" fill="${COL[id]}"><title>V${l.lap}: ${l.t.toFixed(3)}</title></circle>`; });
+          L.forEach((l, i) => { g += `<circle cx="${X(i).toFixed(1)}" cy="${Y(l.t).toFixed(1)}" r="${l.t == b ? 5 : 2.5}" fill="${COL[id]}"><title>V${l.lap}: ${tVuelta(l.t)}</title></circle>`; });
           const ib = L.findIndex(l => l.t == b);
-          g += `<text x="${X(ib).toFixed(1)}" y="${(Y(b) - 10).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="600" fill="${COL[id]}">${b.toFixed(3)}</text>`;
+          g += `<text x="${X(ib).toFixed(1)}" y="${(Y(b) - 10).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="600" fill="${COL[id]}">${tVuelta(b)}</text>`;
         }
         return g + `</svg><p class="small ink2">Cada punto es una vuelta: más arriba, más rápida. Las vueltas lentas (salida de boxes) quedan cortadas abajo.</p>`;
       };
@@ -402,7 +402,7 @@
         if (!recs.length && op) for (const t of KTX.optimoTips(op).slice(0, 3)) tips.push({ n: t.n, a: { title: t.why.length ? corto(t.why[0]).replace(/^./, c => c.toUpperCase()) : "Repetí esa curva", pot: t.gain } });
         h += `<section class="sp2">
           <div class="hero" style="--c:${COL[REF]}"><div class="hero-n"><span class="big">${BT(REF)}</span><span class="small ink2">tu mejor vuelta</span></div>
-            <div class="hero-t">${op ? `<p class="lead2">Podés hacer <b>${op.optima.toFixed(3)}</b> juntando tus mejores curvas.</p><p class="ink2">Son <b>${(op.mejor - op.optima).toFixed(2)} s</b> que ya hiciste, pero en vueltas distintas.</p>` : ""}</div></div>
+            <div class="hero-t">${op ? `<p class="lead2">Podés hacer <b>${tVuelta(op.optima)}</b> juntando tus mejores curvas.</p><p class="ink2">Son <b>${(op.mejor - op.optima).toFixed(2)} s</b> que ya hiciste, pero en vueltas distintas.</p>` : ""}</div></div>
           ${tips.length ? `<div class="panel"><div class="eyebrow">Dónde ganar tiempo</div><ol class="todo">${tips.map(t => `<li class="go" data-cvgo="${t.n}"><span class="nb">${t.n}</span><div><b>${t.a.title}</b><small>curva ${t.n} · podés ganar ${t.a.pot.toFixed(2)} s · ver la curva ›</small></div></li>`).join("")}</ol></div>` : ""}
           <div class="tiles">${co ? tile("Constancia", co.txt, `±${co.sd.toFixed(2)} s entre vueltas`, co.ok ? "" : "warn") : ""}
             ${(() => { const m = motorTile(REF); return tile("Motor", m.ok ? (m.t == "Sin comparar" ? "OK" : m.t) : m.t, [m.d, carbTxt(REF)].filter(Boolean).join(" · "), m.ok ? "" : "bad"); })()}</div>
@@ -547,8 +547,8 @@
           h += `<tr><td><span class="dot" style="--c:${COL[id]}"></span>${NAME(id)} <span class="muted">prom.</span></td>` + b.avg.map((v, i) => {
             const d = v - ref.avg[i];
             return `<td>${v.toFixed(3)}${id == REF ? "" : ` <span class="${d > 0.02 ? "b" : d < -0.02 ? "g" : "muted"}">${sgn(d)}</span>`}</td>`;
-          }).join("") + `<td>${tot.toFixed(3)}${id == REF ? "" : ` <span class="${tot - tref > 0.02 ? "b" : tot - tref < -0.02 ? "g" : "muted"}">${sgn(tot - tref)}</span>`}</td></tr>`;
-          h += `<tr class="sub"><td class="muted">&nbsp;&nbsp;&nbsp;mejor sector</td>` + b.best.map(v => `<td class="muted">${v.toFixed(3)}</td>`).join("") + `<td class="muted">ideal ${b.best.reduce((a, x) => a + x, 0).toFixed(3)}</td></tr>`;
+          }).join("") + `<td>${tVuelta(tot)}${id == REF ? "" : ` <span class="${tot - tref > 0.02 ? "b" : tot - tref < -0.02 ? "g" : "muted"}">${sgn(tot - tref)}</span>`}</td></tr>`;
+          h += `<tr class="sub"><td class="muted">&nbsp;&nbsp;&nbsp;mejor sector</td>` + b.best.map(v => `<td class="muted">${v.toFixed(3)}</td>`).join("") + `<td class="muted">ideal ${tVuelta(b.best.reduce((a, x) => a + x, 0))}</td></tr>`;
         }
         box.querySelector(".sec-body").innerHTML = h + "</tbody></table></div>";
         const svg = box.querySelector(".smap"), tp2 = tx.map((x, i) => MX(x).toFixed(1) + "," + MY(ty[i]).toFixed(1));
@@ -664,12 +664,12 @@
       for (const id of IDS) {
         const s = S[id], ml = Object.fromEntries((M.sessions[id].laps || []).map(l => [l.lap, l]));
         el("polyline", { points: s.laps.map(l => XL(l.lap).toFixed(1) + "," + Y(l.t).toFixed(1)).join(" "), fill: "none", stroke: COL[id], "stroke-width": 2 }, svg);
-        for (const l of s.laps) { const d = el("circle", { cx: XL(l.lap), cy: Y(l.t), r: 4.5, fill: COL[id], stroke: "var(--panel)", "stroke-width": 2 }, svg); el("title", {}, d).textContent = `${BT(id)} vuelta ${l.lap}: ${l.t.toFixed(3)} s${l.agua != null ? " · agua " + l.agua + " °C" : ""}${ml[l.lap] ? " · " + ml[l.lap].kmh_max.toFixed(1) + " km/h" : ""}`; }
+        for (const l of s.laps) { const d = el("circle", { cx: XL(l.lap), cy: Y(l.t), r: 4.5, fill: COL[id], stroke: "var(--panel)", "stroke-width": 2 }, svg); el("title", {}, d).textContent = `${BT(id)} vuelta ${l.lap}: ${tVuelta(l.t)}${l.agua != null ? " · agua " + l.agua + " °C" : ""}${ml[l.lap] ? " · " + ml[l.lap].kmh_max.toFixed(1) + " km/h" : ""}`; }
       }
       let h = `<thead><tr><th>Tanda · vuelta</th><th>Tiempo</th><th>Dif. mejor</th><th>Agua °C</th><th>V máx</th><th>RPM máx</th></tr></thead><tbody>`;
       for (const id of IDS) {
         const s = S[id], ml = Object.fromEntries((M.sessions[id].laps || []).map(l => [l.lap, l])), best = Math.min(...s.laps.map(l => l.t));
-        s.laps.forEach((l, j) => { const m = ml[l.lap]; h += `<tr class="${j == 0 ? "first" : ""}"><td><span class="dot" style="--c:${COL[id]}"></span>${BT(id)} · V${l.lap}</td><td>${l.t.toFixed(3)}</td><td class="${l.t == best ? "g" : ""}">${l.t == best ? "mejor" : "+" + (l.t - best).toFixed(3)}</td><td>${l.agua ?? "–"}</td><td>${m ? m.kmh_max.toFixed(1) : "–"}</td><td>${m ? Math.round(m.rpm_max) : "–"}</td></tr>`; });
+        s.laps.forEach((l, j) => { const m = ml[l.lap]; h += `<tr class="${j == 0 ? "first" : ""}"><td><span class="dot" style="--c:${COL[id]}"></span>${BT(id)} · V${l.lap}</td><td>${tVuelta(l.t)}</td><td class="${l.t == best ? "g" : ""}">${l.t == best ? "mejor" : "+" + (l.t - best).toFixed(3)}</td><td>${l.agua ?? "–"}</td><td>${m ? m.kmh_max.toFixed(1) : "–"}</td><td>${m ? Math.round(m.rpm_max) : "–"}</td></tr>`; });
       }
       P(3).querySelector(".laptbl").innerHTML = h + "</tbody>";
     })();
