@@ -23,7 +23,7 @@
   const KT_status = m => { const b = document.querySelector(".busy .ink2"); if (b) b.textContent = m; };
   const colorOf = p => { const i = sel.indexOf(p); return i < 0 ? null : PAL[i % PAL.length]; };
 
-  const label = r => r.mejor_n ? r.mejor : "sin vueltas";
+  const label = r => r.mejor_n ? tVuelta(r.mejor_n) : "sin vueltas";
   const tip = r => [`Tanda ${r.id} · ${r.fecha} ${r.hora}`, r.piloto && `Piloto: ${r.piloto}`, r.kart && `Vehículo: ${r.kart}`, r.pista && `Pista: ${r.pista}`,
     r.campeonato && `Campeonato: ${r.campeonato}`, r.tipo && `Tipo de sesión: ${r.tipo}`, `Vueltas: ${r.vueltas}`, r.archivo && `Archivo: ${r.archivo} (${r.kb} kB)`,
     r.comentario && `Comentario: ${r.comentario}`].filter(Boolean).join("\n");
@@ -36,7 +36,7 @@
   const visibles = () => {
     const q = $("q").value.toLowerCase().trim(), only = $("onlylaps").checked;
     return rows.filter(r => (!only || r.vueltas > 0 || sel.includes(r.path)) &&
-      (!q || [r.id, r.fecha, r.hora, r.kart, r.pista, r.comentario, r.mejor, r.campeonato, r.piloto, r.tipo].join(" ").toLowerCase().includes(q)));
+      (!q || [r.id, r.fecha, r.hora, r.kart, r.pista, r.comentario, r.mejor, r.mejor_n ? tVuelta(r.mejor_n) : "", r.campeonato, r.piloto, r.tipo].join(" ").toLowerCase().includes(q)));
   };
   const rango = rs => { const o = rs.map(r => r.orden).sort(), f = x => rs.find(r => r.orden == x).fecha; const a = f(o[0]), b = f(o[o.length - 1]); return a == b ? a : `${a.slice(0, 5)} – ${b}`; };
   function renderList() {
@@ -321,7 +321,7 @@
       const msg = d.querySelector("#rp-msg").value.trim(); if (!msg) return;
       const tech = d.querySelector("#rp-tech").checked ? [
         `Versión: ${VERSION} (${IS_WEB ? "web" : "escritorio"})`, `Navegador: ${navigator.userAgent}`,
-        `Tandas elegidas: ${sel.map(p => { const r = rowOf(p) || {}; return `${r.mejor} ${r.fecha} ${r.hora} ${r.pista} (#${r.id})`; }).join("; ") || "ninguna"}`,
+        `Tandas elegidas: ${sel.map(p => { const r = rowOf(p) || {}; return `${r.mejor_n ? tVuelta(r.mejor_n) : "–"} ${r.fecha} ${r.hora} ${r.pista} (#${r.id})`; }).join("; ") || "ninguna"}`,
         `Último error: ${window.KT_LAST_ERROR || "ninguno"}`].join("\n") : "";
       const st = d.querySelector("#rp-st"); st.textContent = "Enviando…"; st.className = "small ink2";
       try {
