@@ -38,13 +38,16 @@
   }
   function modal(vehicle, onDone) {
     const k = get(vehicle), d = document.createElement("div");
-    const sel = (id, list, v) => `<input id="${id}" list="${id}-l" value="${esc(v)}" autocomplete="off"><datalist id="${id}-l">${list.map(x => `<option value="${esc(x)}">`).join("")}</datalist>`;
+    // Suma a la lista lo que ya se escribio a mano en otros karts, para no tener que tipearlo de nuevo.
+    const usados = campo => Object.values(store.get("kt-karts", {})).map(x => (x[campo] || "").trim()).filter(Boolean);
+    const lista = (base, campo) => [...new Set([...base.filter(x => x !== "Otro" && x !== "Otra"), ...usados(campo)])];
+    const sel = (id, list, v, ph) => `<input id="${id}" list="${id}-l" value="${esc(v)}" placeholder="${ph}" autocomplete="off"><datalist id="${id}-l">${list.map(x => `<option value="${esc(x)}">`).join("")}</datalist>`;
     d.className = "modal";
     d.innerHTML = `<form class="mbox" role="dialog" aria-modal="true" aria-labelledby="kt-kt"><h2 id="kt-kt">¿Qué kart es?</h2>
-      <p class="ink2 small">La MyChron lo llama <b>${esc(vehicle || "sin nombre")}</b>. Elegí o escribí la categoría, el chasis y el motor. Queda guardado para este kart.</p>
-      <div class="sgrid"><label><span>Categoría</span>${sel("kt-cat", CATEGORIAS, k.categoria)}</label>
-        <label><span>Chasis</span>${sel("kt-ch", CHASIS, k.chasis)}</label>
-        <label class="full"><span>Motor</span>${sel("kt-mo", MOTORES, k.motor)}</label></div>
+      <p class="ink2 small">La MyChron lo llama <b>${esc(vehicle || "sin nombre")}</b>. Elegí de la lista o escribí uno nuevo si no está. Queda guardado para este kart y la próxima vez aparece en la lista.</p>
+      <div class="sgrid"><label><span>Categoría</span>${sel("kt-cat", lista(CATEGORIAS, "categoria"), k.categoria, "Elegí o escribí la categoría")}</label>
+        <label><span>Chasis</span>${sel("kt-ch", lista(CHASIS, "chasis"), k.chasis, "Elegí o escribí la marca")}</label>
+        <label class="full"><span>Motor</span>${sel("kt-mo", lista(MOTORES, "motor"), k.motor, "Elegí o escribí el motor")}</label></div>
       <div class="mact"><button type="button" class="btn" id="kt-x">Cancelar</button><button type="submit" class="btn primary">Guardar</button></div></form>`;
     document.body.appendChild(d);
     const cat = d.querySelector("#kt-cat"), mo = d.querySelector("#kt-mo");
