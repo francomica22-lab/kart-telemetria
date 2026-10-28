@@ -1,4 +1,4 @@
-# Análisis Karting
+# IVO · Análisis Karting
 
 Compará tandas de la **AiM MyChron** (archivos `.xrk`) curva por curva: cuánto se pierde, dónde, si es manejo o agarre, y cómo rindió el motor.
 

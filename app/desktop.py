@@ -184,7 +184,7 @@ def main():
     except Exception:
         traceback.print_exc()
     api = Api()
-    webview.create_window(f"Análisis Karting {VERSION}", os.path.join(WEB, "index.html"), js_api=api,
+    webview.create_window(f"IVO {VERSION}", os.path.join(WEB, "index.html"), js_api=api,
                           width=1440, height=900, min_size=(1100, 680), background_color="#0d1015")
     webview.start(gui="edgechromium", private_mode=False, storage_path=os.path.join(CFG_DIR, "webview"))
 

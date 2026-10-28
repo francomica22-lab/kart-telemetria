@@ -326,7 +326,7 @@
       const st = d.querySelector("#rp-st"); st.textContent = "Enviando…"; st.className = "small ink2";
       try {
         const r = await fetch(REPORT_URL, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ _subject: `Análisis Karting · reporte (${IS_WEB ? "web" : "escritorio"} ${VERSION})`, _template: "box", nombre: d.querySelector("#rp-who").value.trim() || "anónimo", mensaje: msg, datos_tecnicos: tech }) });
+          body: JSON.stringify({ _subject: `IVO · reporte (${IS_WEB ? "web" : "escritorio"} ${VERSION})`, _template: "box", nombre: d.querySelector("#rp-who").value.trim() || "anónimo", mensaje: msg, datos_tecnicos: tech }) });
         const j = await r.json().catch(() => ({}));
         if (!r.ok || j.success === "false" || j.success === false) throw new Error(j.message || "error");
         d.remove(); toast("¡Gracias! El reporte se envió.");

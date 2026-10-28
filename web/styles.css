@@ -27,7 +27,8 @@ p{margin:0;max-width:72ch}
 .side > *{min-width:0}
 .pad{padding:14px 10px}
 .brand{padding:18px 16px 14px;display:grid;gap:14px}
-.brand .mark{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.brand .mark{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.brand .mark img.logo{display:block;height:30px;width:auto}
 .brand .mark b{font:700 20px var(--display);letter-spacing:.05em;text-transform:uppercase}
 .brand .mark span{font:600 10px var(--display);letter-spacing:.16em;color:var(--good);text-transform:uppercase;border:1px solid color-mix(in srgb,var(--good) 45%,transparent);padding:1px 6px;border-radius:3px}
 .folder{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:9px 10px 9px 12px;cursor:pointer}

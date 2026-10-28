@@ -32,7 +32,7 @@ jobs:
 
       - name: Armar ejecutable
         run: >
-          pyinstaller --noconfirm --windowed --onedir --name AnalisisKarting
+          pyinstaller --noconfirm --windowed --onedir --name AnalisisKarting --icon web/img/ivo.ico
           --paths app --add-data "web;web" --add-data "VERSION;."
           --collect-all libxrk --collect-all webview --collect-submodules pyarrow
           --exclude-module matplotlib --exclude-module IPython --exclude-module tkinter
@@ -51,4 +51,4 @@ jobs:
           $notes = git tag -l --format='%(contents)' "${{ github.ref_name }}"
           if (-not $notes) { $notes = "Versión ${{ github.ref_name }}" }
           Set-Content -Encoding utf8 notas.txt $notes
-          gh release create "${{ github.ref_name }}" AnalisisKarting-windows.zip --title "Análisis Karting ${{ github.ref_name }}" --notes-file notas.txt
+          gh release create "${{ github.ref_name }}" AnalisisKarting-windows.zip --title "IVO ${{ github.ref_name }}" --notes-file notas.txt

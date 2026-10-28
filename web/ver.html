@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Reporte compartido · Análisis Karting</title>
+<title>Reporte compartido · IVO</title>
+<link rel="icon" href="img/ivo-icono.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
 <link rel="stylesheet" href="styles.css">
 <style>
   html,body{height:auto}
@@ -14,7 +16,7 @@
 </style>
 </head>
 <body>
-<div class="vbar"><span><b>Análisis Karting</b> <span class="muted small">· reporte compartido</span></span>
+<div class="vbar"><span><img src="img/ivo.svg" alt="IVO" style="height:22px;vertical-align:-5px;margin-right:6px"> <span class="muted small">· reporte compartido</span></span>
   <span style="display:flex;gap:8px"><button class="btn" id="v-pdf" hidden>PDF</button><a class="btn" href="./" style="text-decoration:none">Analizar mis tandas</a></span></div>
 <div id="app"><div class="vmsg"><div class="spin"></div><p class="ink2">Cargando el reporte…</p></div></div>
 <script src="catalogo.js"></script>
@@ -24,13 +26,13 @@
 <script>
 (async () => {
   const app = document.getElementById("app"), id = location.hash.slice(1);
-  const fail = msg => app.innerHTML = `<div class="vmsg"><h1>Reporte no disponible</h1><p class="ink2">${msg}</p><p><a class="btn" href="./" style="text-decoration:none">Ir a Análisis Karting</a></p></div>`;
+  const fail = msg => app.innerHTML = `<div class="vmsg"><h1>Reporte no disponible</h1><p class="ink2">${msg}</p><p><a class="btn" href="./" style="text-decoration:none">Ir a IVO</a></p></div>`;
   if (!/^[A-Za-z0-9_-]{6,20}$/.test(id)) return fail("El link está incompleto. Pedile a quien te lo mandó que lo copie de nuevo.");
   try {
     const D = await KTR.ver(id);
     if (!D || !D.sessions) return fail("El reporte venció (duran 30 días) o el link no es correcto.");
     renderReport(D, app, {});
-    document.title = `${D.sessions.map(s => tVuelta(s.top[0])).join(" vs ")} · Análisis Karting`;
+    document.title = `${D.sessions.map(s => tVuelta(s.top[0])).join(" vs ")} · IVO`;
     const b = document.getElementById("v-pdf"); b.hidden = false; b.addEventListener("click", () => KTR.printNow(app));
   } catch (e) { fail("No se pudo cargar. Revisá la conexión e intentá de nuevo."); }
 })();
