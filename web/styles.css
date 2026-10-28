@@ -508,3 +508,5 @@ p.foot{background:none;border:0;padding:0;max-width:none}
 ol.todo > li.go{cursor:pointer;border-radius:6px}
 ol.todo > li.go:hover b{text-decoration:underline}
 @media (max-width:900px){.cvt-top{grid-template-columns:1fr}.cvt-map{height:240px}}
+
+.vbox.vdrop{outline:2px dashed var(--ink2);outline-offset:4px}

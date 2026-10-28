@@ -782,6 +782,14 @@
   }
 
   /* ---------- video ---------- */
+  const esVideo = f => /^video\//.test(f.type) || /\.(mp4|mov|m4v|webm|mkv|avi)$/i.test(f.name);
+  // carga un archivo en el recuadro de video de una tanda, como si lo hubiera elegido con el botón
+  function cargarVideo(box, f) {
+    const input = box.querySelector("input[type=file]"); if (!input) return false;
+    const dt = new DataTransfer(); dt.items.add(f); input.files = dt.files;
+    input.dispatchEvent(new Event("change"));
+    return true;
+  }
   // FFT radix-2 (in-place) para estimar el tono del motor
   function fft(re, im) {
     const n = re.length;
@@ -893,6 +901,15 @@
         if (p.s != null) { const i = idxAt(p.s); dots[id].setAttribute("cx", MX(tx[i])); dots[id].setAttribute("cy", MY(ty[i])); dots[id].setAttribute("opacity", 1); }
         return p;
       };
+      // también se puede soltar el video arriba del recuadro
+      box.addEventListener("dragover", e => { e.preventDefault(); e.stopPropagation(); box.classList.add("vdrop"); });
+      box.addEventListener("dragleave", e => { if (!box.contains(e.relatedTarget)) box.classList.remove("vdrop"); });
+      box.addEventListener("drop", e => {
+        e.preventDefault(); e.stopPropagation(); box.classList.remove("vdrop");
+        const f = [...e.dataTransfer.files].find(esVideo);
+        if (f) cargarVideo(box, f);
+        else { box.querySelector(".vstat").textContent = "Eso no es un video. Soltá un .mp4 o tocá Elegir video."; box.querySelector(".vsync").hidden = false; }
+      });
       file.addEventListener("change", () => {
         const f = file.files[0]; if (!f) return;
         st.key = `kt-vsync-${f.name}-${f.size}-${id}`;
@@ -1025,5 +1042,5 @@
     root.querySelector(".csim").innerHTML = others.length ? `<div class="tw"><table><thead><tr><th>Circuito</th><th>Parecido</th><th>Largo</th><th>V media</th><th>Curvas</th><th>Agarre</th></tr></thead><tbody>${others.map(o => `<tr title="${esc(o.resumen)}"><td>${esc(o.nombre || "–")}</td><td class="${o.sim >= 75 ? "g" : ""}">${o.sim}%</td><td>${o.largo} m</td><td>${o.v_media} km/h</td><td>${o.curvas}</td><td>${o.grip} g</td></tr>`).join("")}</tbody></table></div>` : `<p class="muted small">Todavía no hay otros circuitos guardados. Cuando analices tandas de otra pista, aparece acá cuánto se parece a ${esc(c.nombre || "esta")}.</p>`;
   }
 
-  window.KTX = { circuitPane, wireCircuit, circuitSummary, audioSpectrum, spectralSync, setupDiff, setupChips, setupModal, climaTxt, optimoPane, simpleOptimo, optimoTips, lapTrend, curvaTool, wireCurva, cornerTip, powerPanel, drawPower, hpDelta, carbPanel, carbSimple, wireCarb, carbCorto, transPane, wireTrans, sensorsPane, drawWater, videoPane, wireVideo, store };
+  window.KTX = { esVideo, cargarVideo, circuitPane, wireCircuit, circuitSummary, audioSpectrum, spectralSync, setupDiff, setupChips, setupModal, climaTxt, optimoPane, simpleOptimo, optimoTips, lapTrend, curvaTool, wireCurva, cornerTip, powerPanel, drawPower, hpDelta, carbPanel, carbSimple, wireCarb, carbCorto, transPane, wireTrans, sensorsPane, drawWater, videoPane, wireVideo, store };
 })();

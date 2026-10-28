@@ -183,6 +183,13 @@
     document.addEventListener("dragleave", e => { if (!e.relatedTarget) document.body.classList.remove("drop"); });
     document.addEventListener("drop", async e => {
       e.preventDefault(); document.body.classList.remove("drop");
+      const videos = [...e.dataTransfer.files].filter(f => window.KTX && KTX.esVideo(f));
+      if (videos.length) {
+        // un video soltado en cualquier lado va a los recuadros de video del análisis abierto, en orden
+        const boxes = [...document.querySelectorAll(".vbox")].filter(b => b.offsetParent && b.querySelector("input[type=file]"));
+        if (boxes.length) { videos.slice(0, boxes.length).forEach((f, i) => KTX.cargarVideo(boxes[i], f)); return; }
+        return toast("Eso es un video. Primero analizá la tanda, después abrí la parte Video y cargalo ahí.", true);
+      }
       const files = await collect([...e.dataTransfer.items]);
       if (files.length) pick(files); else toast("No encontré archivos .xrk en lo que soltaste.", true);
     });
