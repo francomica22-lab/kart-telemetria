@@ -33,7 +33,7 @@ jobs:
       - name: Armar ejecutable
         run: >
           pyinstaller --noconfirm --windowed --onedir --name AnalisisKarting --icon web/img/ivo.ico
-          --paths app --add-data "web;web" --add-data "VERSION;."
+          --paths app --hidden-import formatos --add-data "web;web" --add-data "VERSION;."
           --collect-all libxrk --collect-all webview --collect-submodules pyarrow
           --exclude-module matplotlib --exclude-module IPython --exclude-module tkinter
           app/desktop.py
