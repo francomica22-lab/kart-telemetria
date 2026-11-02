@@ -41,7 +41,7 @@
   const rango = rs => { const o = rs.map(r => r.orden).sort(), f = x => rs.find(r => r.orden == x).fecha; const a = f(o[0]), b = f(o[o.length - 1]); return a == b ? a : `${a.slice(0, 5)} – ${b}`; };
   function renderList() {
     const vis = visibles();
-    if (!vis.length) { $("list").innerHTML = `<p class="muted pad">${rows.length ? "Ninguna tanda coincide." : "No hay archivos .xrk en esta carpeta."}</p>`; renderHome(); return; }
+    if (!vis.length) { $("list").innerHTML = `<p class="muted pad">${rows.length ? "Ninguna tanda coincide." : "No hay tandas en esta carpeta (.xrk, .ld o .vbo)."}</p>`; renderHome(); return; }
     const groups = {};
     for (const r of vis) (groups[pistaDe(r)] = groups[pistaDe(r)] || []).push(r);
     // el circuito mas reciente primero
@@ -155,7 +155,7 @@
 
   function emptyList() {
     $("fname").textContent = "Elegí una carpeta"; $("path").textContent = IS_WEB ? "Tus archivos no salen de tu PC" : "La carpeta donde descargás las tandas";
-    $("list").innerHTML = `<div class="pad pick-hint"><p>Elegí la carpeta donde guardás los archivos <b>.xrk</b> de la MyChron (la de Race Studio o cualquier otra).</p>
+    $("list").innerHTML = `<div class="pad pick-hint"><p>Elegí la carpeta donde guardás las tandas: <b>.xrk</b> de la MyChron, <b>.ld</b> de MoTeC o <b>.vbo</b> de VBOX.</p>
       <button class="btn" id="pick2">Elegir carpeta</button>${IS_WEB ? `<p class="muted">También podés arrastrar la carpeta o los archivos acá.</p>` : ""}</div>`;
     $("pick2").addEventListener("click", pick);
   }
@@ -172,7 +172,7 @@
     const collect = async items => {
       const out = [];
       const walk = entry => new Promise(res => {
-        if (entry.isFile) entry.file(f => { if (f.name.toLowerCase().endsWith(".xrk")) out.push(f); res(); }, () => res());
+        if (entry.isFile) entry.file(f => { if (/\.(xrk|ld|ldx|vbo)$/i.test(f.name)) out.push(f); res(); }, () => res());
         else if (entry.isDirectory) { const rd = entry.createReader(); const all = []; const next = () => rd.readEntries(async es => { if (!es.length) { for (const x of all) await walk(x); res(); } else { all.push(...es); next(); } }, () => res()); next(); }
         else res();
       });
@@ -191,7 +191,9 @@
         return toast("Eso es un video. Primero analizá la tanda, después abrí la parte Video y cargalo ahí.", true);
       }
       const files = await collect([...e.dataTransfer.items]);
-      if (files.length) pick(files); else toast("No encontré archivos .xrk en lo que soltaste.", true);
+      if (files.some(f => !/\.ldx$/i.test(f.name))) pick(files);
+      else if ([...e.dataTransfer.files].some(f => /\.(rar|zip|7z)$/i.test(f.name))) toast("Ese archivo está comprimido. Descomprimilo primero y soltá la carpeta que sale.", true);
+      else toast("No encontré tandas en lo que soltaste (.xrk de AiM, .ld de MoTeC o .vbo de VBOX).", true);
     });
   }
   $("reload").addEventListener("click", scan);
@@ -357,7 +359,7 @@
     if (IS_WEB) {
       $("empty").innerHTML = `<div class="eyebrow">Análisis de telemetría AiM MyChron</div>
         <h1>Compará tus tandas, curva por curva</h1>
-        <p>Elegí la carpeta con tus archivos <b>.xrk</b> (los que descarga Race Studio 3), tocá dos tandas y compará.
+        <p>Elegí la carpeta con tus tandas (<b>.xrk</b> de AiM, <b>.ld</b> de MoTeC o <b>.vbo</b> de VBOX), tocá dos y compará.
         Te dice cuánto perdés, en qué curva, si es manejo o agarre, y cómo rindió el motor.</p>
         <p class="ink2">Todo se calcula en tu navegador: tus archivos no se suben a ningún lado. <a href="privacidad.html" target="_blank" rel="noopener" style="color:var(--ink2)">Privacidad</a></p>
         <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px"><button class="btn primary" style="width:auto" id="pick3">Elegir carpeta de tandas</button>

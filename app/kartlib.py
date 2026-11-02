@@ -1,4 +1,4 @@
-"""Carga de sesiones AiM (.xrk), seleccion de mejores vueltas y analisis curva por curva."""
+"""Carga de sesiones (AiM .xrk, MoTeC .ld, VBOX .vbo), seleccion de mejores vueltas y analisis curva por curva."""
 import contextlib, io, os
 import numpy as np
 import pandas as pd
@@ -22,7 +22,14 @@ SKIP_CH = {"Best Run Diff", "Best Today Diff", "Prev Lap Diff", "Ref Lap Diff", 
            "TimePulseTick", "ZeroX5", "ZeroX50", "Distance Lap", "MagnetomX", "MagnetomY", "MagnetomZ"}
 
 
+EXT = (".xrk", ".ld", ".vbo")  # archivos de tanda que se pueden abrir
+
+
 def load_session(path):
+    ext = os.path.splitext(path)[1].lower()
+    if ext in (".ld", ".vbo"):
+        import formatos
+        return formatos.load_ld(path) if ext == ".ld" else formatos.load_vbo(path)
     with contextlib.redirect_stdout(io.StringIO()):
         log = aim_xrk(path)
     md = log.metadata

@@ -8,6 +8,7 @@ import json, os, sys, threading, traceback
 import webview
 
 import updater
+from kartlib import EXT
 from sesiones import session_info, clean
 from tandas import build_data, render_html
 import setup_kart  # noqa: F401 (lo usa save_setup)
@@ -76,7 +77,7 @@ class Api:
             return {"folder": None, "rows": [], "errors": []}
         files = []
         for dp, _, fs in os.walk(folder):
-            files += [os.path.join(dp, f) for f in fs if f.lower().endswith(".xrk")]
+            files += [os.path.join(dp, f) for f in fs if f.lower().endswith(EXT)]
         rows, errors, new = [], [], False
         for p in files:
             key = f"{p}|{os.path.getmtime(p)}"

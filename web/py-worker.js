@@ -14,7 +14,7 @@ async function init(id) {
   await py.pyimport("micropip").install("libxrk==0.13.0");
   py.FS.mkdirTree("/home/pyodide/kt");
   py.FS.mkdirTree("/data");
-  for (const m of ["kartlib", "motor", "tandas", "sesiones", "setup_kart", "circuito"]) {
+  for (const m of ["kartlib", "formatos", "motor", "tandas", "sesiones", "setup_kart", "circuito"]) {
     const r = await fetch(`app/${m}.py`, { cache: "no-cache" });
     if (!r.ok) throw new Error(`No se pudo cargar ${m}.py`);
     py.FS.writeFile(`/home/pyodide/kt/${m}.py`, await r.text());
@@ -41,13 +41,18 @@ onmessage = async e => {
     if (cmd == "init") { await init(id); postMessage({ id, ok: true }); return; }
     if (cmd == "add") {
       const rows = [], errors = [];
-      for (const f of e.data.files) {
+      const stem = n => n.replace(/\.[^.]*$/, "").toLowerCase();
+      const ldx = Object.fromEntries(e.data.files.filter(f => /\.ldx$/i.test(f.name)).map(f => [stem(f.name), f]));
+      const files = e.data.files.filter(f => !/\.ldx$/i.test(f.name));
+      for (const f of files) {
         py.FS.mkdirTree(`/data/${f.key}`);
         const path = `/data/${f.key}/${f.name.replace(/[\/]/g, "_")}`;   // conserva el nombre: el numero de tanda sale de ahi
         py.FS.writeFile(path, new Uint8Array(f.buf));
+        const x = /\.ld$/i.test(f.name) && ldx[stem(f.name)];   // MoTeC: las vueltas estan en el .ldx de al lado
+        if (x) py.FS.writeFile(path.replace(/\.ld$/i, ".ldx"), new Uint8Array(x.buf));
         try { rows.push(JSON.parse(py.globals.get("_info")(path, f.name))); }
         catch (err) { errors.push(`${f.name}: ${String(err.message || err).split("\n").pop()}`); py.globals.get("_remove")(path); }
-        postMessage({ id, status: `Leyendo tandas… ${rows.length + errors.length}/${e.data.files.length}` });
+        postMessage({ id, status: `Leyendo tandas… ${rows.length + errors.length}/${files.length}` });
       }
       postMessage({ id, ok: true, rows, errors }); return;
     }
