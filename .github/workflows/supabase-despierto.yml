@@ -1,0 +1,22 @@
+name: Supabase despierto
+
+# El plan gratis de Supabase pausa el proyecto despues de una semana sin uso.
+# Esto hace una consulta chica cada 3 dias para que no se pause (sin datos: codigo inexistente).
+on:
+  schedule:
+    - cron: "17 12 */3 * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar la base
+        run: |
+          code=$(curl -s -o r.json -w "%{http_code}" -X POST \
+            "https://zbesblxiezcfurswanev.supabase.co/rest/v1/rpc/ver_compartido" \
+            -H "apikey: sb_publishable_HRIpZ4BfWemVZ8TNA37-EQ_tKN1joRG" \
+            -H "Content-Type: application/json" -d '{"p_id":"keepalive"}')
+          echo "HTTP $code"; head -c 300 r.json; echo
+          # 200 = la base respondio; cualquier otra cosa avisa por mail (falla el job)
+          test "$code" = "200"
